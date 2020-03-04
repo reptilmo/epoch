@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29709.97
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Epoch.Engine", "Epoch.Engine\Epoch.Engine.vcxproj", "{9460A7EE-9E01-4C9B-A4EB-64503301CF75}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C18515A8-FB2E-4EA0-9809-92B2BC830D46}"
+	ProjectSection(SolutionItems) = preProject
+		CHANGELOG.md = CHANGELOG.md
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9460A7EE-9E01-4C9B-A4EB-64503301CF75}.Debug|x64.ActiveCfg = Debug|x64
+		{9460A7EE-9E01-4C9B-A4EB-64503301CF75}.Debug|x64.Build.0 = Debug|x64
+		{9460A7EE-9E01-4C9B-A4EB-64503301CF75}.Release|x64.ActiveCfg = Debug|x64
+		{9460A7EE-9E01-4C9B-A4EB-64503301CF75}.Release|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FC686FC2-88F2-4941-9036-FEB429924FF5}
+	EndGlobalSection
+EndGlobal
