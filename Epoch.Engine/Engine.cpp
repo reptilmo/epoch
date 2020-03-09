@@ -21,6 +21,6 @@ namespace Epoch {
     }
 
     void Engine::OnLoop( const F32 deltaTime ) {
-
+        _renderer->Frame( deltaTime );
     }
 }

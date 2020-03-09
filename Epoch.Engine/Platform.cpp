@@ -4,7 +4,7 @@
 
 #include "Logger.h"
 #include "Engine.h"
-#include "VulkanUtils.h"
+#include "VulkanUtilities.h"
 #include "Platform.h"
 
 namespace Epoch {
@@ -19,6 +19,7 @@ namespace Epoch {
 
         _window = glfwCreateWindow( 1280, 720, applicationName, nullptr, nullptr );
         glfwSetWindowUserPointer( _window, this );
+        glfwSetFramebufferSizeCallback( _window, Platform::onFrameBufferResize );
 
     }
     Platform::~Platform() {
@@ -51,5 +52,14 @@ namespace Epoch {
         }
 
         return true;
+    }
+
+    void Platform::WaitEvents() {
+        glfwWaitEvents();
+    }
+
+    void Platform::onFrameBufferResize( GLFWwindow* window, I32 width, I32 height ) {
+        WindowResizedEvent resizeEvent( window, 0, 0, (U32)width, (U32)height );
+        resizeEvent.Post();
     }
 }

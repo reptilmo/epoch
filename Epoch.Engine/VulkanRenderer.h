@@ -2,6 +2,8 @@
 
 #include "Types.h"
 
+#include "Events/IEventHandler.h"
+
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -14,11 +16,16 @@ namespace Epoch {
     };
 
     class Platform;
+    class VulkanImage;
 
-    class VulkanRenderer {
+    class VulkanRenderer : public IEventHandler {
     public:
         VulkanRenderer( Platform* platform );
         ~VulkanRenderer();
+
+        void Frame( const F32 deltaTime );
+
+        void OnEvent( const Event& event ) override;
 
     private:
         VkPhysicalDevice selectPhysicalDevice();
@@ -33,6 +40,12 @@ namespace Epoch {
         void createRenderPass();
         void createGraphicsPipeline();
         void createCommandPool();
+        void createDepthResources();
+        void createFramebuffers();
+        void createCommandBuffers();
+        void createSyncObjects();
+        void cleanupSwapchain();
+        void recreateSwapchain();
     private:
         Platform* _platform;
 
@@ -64,5 +77,25 @@ namespace Epoch {
         VkPipeline _pipeline;
 
         VkCommandPool _commandPool;
+
+        // Depth image.
+        VkFormat _depthFormat;
+        VulkanImage* _depthImage;
+
+        // Framebuffers - one each for front/back buffer
+        bool _framebufferResizeOccurred = false;
+        bool _recreatingSwapchain = false;
+        std::vector<VkFramebuffer> _swapchainFramebuffers;
+
+        // Command buffers
+        std::vector<VkCommandBuffer> _commandBuffers;
+
+        // Sync objects
+        U8 _currentFrameIndex;
+        const U8 _maxFramesInFlight = 2;
+        std::vector<VkSemaphore> _imageAvailableSemaphores;
+        std::vector<VkSemaphore> _renderCompleteSemaphores;
+        std::vector<VkFence> _inFlightFences;
+        std::vector<VkFence> _inFlightImageFences;
     };
 }

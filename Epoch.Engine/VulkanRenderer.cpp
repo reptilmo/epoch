@@ -6,7 +6,9 @@
 #include "Logger.h"
 #include "Defines.h"
 #include "TMath.h"
-#include "VulkanUtils.h"
+#include "VulkanUtilities.h"
+#include "VulkanImage.h"
+
 #include "VulkanRenderer.h"
 
 namespace Epoch {
@@ -129,6 +131,14 @@ namespace Epoch {
         createGraphicsPipeline();
 
         createCommandPool();
+
+        createDepthResources();
+        createFramebuffers();
+        createCommandBuffers();
+        createSyncObjects();
+
+        // Listen for resize events.
+        Event::Listen( EventType::WINDOW_RESIZED, this );
     }
 
     VulkanRenderer::~VulkanRenderer() {
@@ -140,6 +150,136 @@ namespace Epoch {
         }
 
         vkDestroyInstance( _instance, nullptr );
+    }
+
+    void VulkanRenderer::Frame( const F32 deltaTime ) {
+
+        // If currently recreating the swapchain, boot out.
+        if( _recreatingSwapchain ) {
+            return;
+        }
+
+        // The operations here are asynchronous and not guaranteed to happen in order. Manage
+        // this with semaphores and fences.
+
+        // Wait for the execution of the current frame to complete. The fence being free will allow this to move on.
+        vkWaitForFences( _device, 1, &_inFlightFences[_currentFrameIndex], VK_TRUE, U64_MAX );
+
+        // Acquire next image from the swap chain.
+        U32 imageIndex;
+        VkResult result = vkAcquireNextImageKHR( _device, _swapchain, U64_MAX, _imageAvailableSemaphores[_currentFrameIndex], VK_NULL_HANDLE, &imageIndex );
+        if( result == VkResult::VK_ERROR_OUT_OF_DATE_KHR ) {
+            // Trigger swapchain recreation, then boot out of the render loop.
+            recreateSwapchain();
+            return;
+        } else if( result != VkResult::VK_SUCCESS && result != VkResult::VK_SUBOPTIMAL_KHR ) {
+            Logger::Fatal( "Failed to acquire swapchain image!" );
+            return;
+        }
+
+        // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
+        // Prepare commands for the queue.
+        // Begin recording.
+        VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+        beginInfo.flags = 0;
+        beginInfo.pInheritanceInfo = nullptr;
+        VK_CHECK( vkBeginCommandBuffer( _commandBuffers[imageIndex], &beginInfo ) );
+
+        // Begin the render pass.
+        VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+        renderPassBeginInfo.renderPass = _renderPass;
+        renderPassBeginInfo.framebuffer = _swapchainFramebuffers[imageIndex];
+        renderPassBeginInfo.renderArea.offset = { 0,0 };
+        renderPassBeginInfo.renderArea.extent = _swapchainExtent;
+
+        // TODO: Clear colour and depth based on configuration.
+        VkClearValue clearValues[2] = {};
+        clearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+        clearValues[1].depthStencil = { 1.0f, 0 };
+        renderPassBeginInfo.clearValueCount = 2;
+        renderPassBeginInfo.pClearValues = clearValues;
+
+        // TODO: make configurable
+        vkCmdBeginRenderPass( _commandBuffers[imageIndex], &renderPassBeginInfo, VkSubpassContents::VK_SUBPASS_CONTENTS_INLINE );
+
+        // Bind the buffer to the graphics pipeline
+        vkCmdBindPipeline( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline );
+
+        // Make the draw call. TODO: use object properties
+        vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
+
+        // TODO: Bind buffers and UBOs here
+
+        // End render pass.
+        vkCmdEndRenderPass( _commandBuffers[imageIndex] );
+
+        // End recording
+        VK_CHECK( vkEndCommandBuffer( _commandBuffers[imageIndex] ) );
+
+        // ////////////////// END COMMAND BUFFERS ///////////////////////////////
+
+        // Check if a previous frame is using this image (i.e. its fence is being waited on)
+        if( _inFlightImageFences[_currentFrameIndex] != VK_NULL_HANDLE ) {
+            vkWaitForFences( _device, 1, &_inFlightImageFences[_currentFrameIndex], VK_TRUE, U64_MAX );
+        }
+
+        // Mark the image fence as in-use by this frame.
+        _inFlightImageFences[_currentFrameIndex] = _inFlightFences[_currentFrameIndex];
+
+        // Submit the queue and wait for the operation to complete.
+        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+
+        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrameIndex] };
+        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores; // Must be signaled from an operation completion before these commands will run.
+        submitInfo.pWaitDstStageMask = waitStages; // Array aligning with pWaitSemaphores indicating which stage the wait will occur.
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &_commandBuffers[imageIndex]; // Command buffers to be executed (primary only).
+
+        VkSemaphore signalSemaphores[] = { _renderCompleteSemaphores[_currentFrameIndex] };
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        // Reset the fence for use on the next frame.
+        vkResetFences( _device, 1, &_inFlightImageFences[_currentFrameIndex] );
+
+        // Submit the queue
+        VK_CHECK( vkQueueSubmit( _graphicsQueue, 1, &submitInfo, _inFlightFences[_currentFrameIndex] ) );
+
+        // Return the image to the swapchain for presentation
+        VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &_swapchain;
+        presentInfo.pImageIndices = &imageIndex;
+        presentInfo.pResults = nullptr;
+
+        result = vkQueuePresentKHR( _presentationQueue, &presentInfo );
+        if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || _framebufferResizeOccurred ) {
+            // Swapchain is out of date, suboptimal or a framebuffer resize hjas occurred. Trigger swapchain recreation.
+            _framebufferResizeOccurred = false;
+            recreateSwapchain();
+        } else if( result != VkResult::VK_SUCCESS ) {
+            Logger::Fatal( "Failed to present swap chain image!" );
+            return;
+        }
+
+        // Increment (and loop) the index.
+        _currentFrameIndex = ( _currentFrameIndex + 1 ) % _maxFramesInFlight;
+    }
+
+    void VulkanRenderer::OnEvent( const Event& event ) {
+        switch( event.Type ) {
+        case EventType::WINDOW_RESIZED:
+            //const WindowResizedEvent wre = (const WindowResizedEvent)event;
+            _framebufferResizeOccurred = true;
+            break;
+        default:
+            break;
+        }
     }
 
     VkPhysicalDevice VulkanRenderer::selectPhysicalDevice() {
@@ -707,5 +847,141 @@ namespace Epoch {
         poolCreateInfo.queueFamilyIndex = _graphicsFamilyQueueIndex;
         poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Reset the next time vkBeginCommandBuffer is called.
         VK_CHECK( vkCreateCommandPool( _device, &poolCreateInfo, nullptr, &_commandPool ) );
+    }
+
+    void VulkanRenderer::createDepthResources() {
+        _depthFormat = VulkanUtilities::FindDepthFormat( _physicalDevice );
+        VulkanImageCreateInfo depthImageCreateInfo;
+        depthImageCreateInfo.Width = _swapchainExtent.width;
+        depthImageCreateInfo.Height = _swapchainExtent.height;
+        depthImageCreateInfo.Type = VK_IMAGE_TYPE_2D;
+        depthImageCreateInfo.Format = _depthFormat;
+        depthImageCreateInfo.Tiling = VK_IMAGE_TILING_OPTIMAL;
+        depthImageCreateInfo.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        depthImageCreateInfo.Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        depthImageCreateInfo.CreateView = true;
+        depthImageCreateInfo.ViewAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        VulkanImage::Create( _physicalDevice, _device, depthImageCreateInfo, &_depthImage );
+    }
+
+    void VulkanRenderer::createFramebuffers() {
+        U32 swapchainImageCount = (U32)_swapchainImageViews.size();
+        _swapchainFramebuffers.resize( swapchainImageCount );
+
+        for( U32 i = 0; i < swapchainImageCount; ++i ) {
+            U32 attachmentCount = 2; // TODO: Make this dynamic based on currently configured attachments.
+            VkImageView attachments[] = {
+                _swapchainImageViews[i],
+                _depthImage->GetView()
+            };
+
+            VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+            framebufferCreateInfo.renderPass = _renderPass;
+            framebufferCreateInfo.attachmentCount = attachmentCount;
+            framebufferCreateInfo.pAttachments = attachments;
+            framebufferCreateInfo.width = _swapchainExtent.width;
+            framebufferCreateInfo.height = _swapchainExtent.height;
+            framebufferCreateInfo.layers = 1;
+
+            VK_CHECK( vkCreateFramebuffer( _device, &framebufferCreateInfo, nullptr, &_swapchainFramebuffers[i] ) );
+        }
+    }
+
+    void VulkanRenderer::createCommandBuffers() {
+        VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        commandBufferAllocateInfo.commandPool = _commandPool;
+        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandBufferAllocateInfo.commandBufferCount = (U32)_swapchainImageViews.size();
+
+        _commandBuffers.resize( _swapchainImageViews.size() );
+
+        VK_CHECK( vkAllocateCommandBuffers( _device, &commandBufferAllocateInfo, _commandBuffers.data() ) );
+    }
+
+    void VulkanRenderer::createSyncObjects() {
+        _imageAvailableSemaphores.resize( _maxFramesInFlight );
+        _renderCompleteSemaphores.resize( _maxFramesInFlight );
+        _inFlightFences.resize( _maxFramesInFlight );
+
+        for( U8 i = 0; i < _maxFramesInFlight; ++i ) {
+            VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+            VK_CHECK( vkCreateSemaphore( _device, &semaphoreCreateInfo, nullptr, &_imageAvailableSemaphores[i] ) );
+            VK_CHECK( vkCreateSemaphore( _device, &semaphoreCreateInfo, nullptr, &_renderCompleteSemaphores[i] ) );
+
+            VkFenceCreateInfo fenceCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+
+            // Create the fence in a signaled state, indicating that the first frame has already been "rendered".
+            // This will prevent the application from waiting indefinitely for the first frame to render since it
+            // cannot be rendered until a frame is "rendered" before it.
+            fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+            VK_CHECK( vkCreateFence( _device, &fenceCreateInfo, nullptr, &_inFlightFences[i] ) );
+        }
+
+        // In flight fences should not yet exist at this point, so clear the list.
+        _inFlightImageFences.resize( _swapchainImages.size() );
+        for( U64 i = 0; i < _swapchainImages.size(); ++i ) {
+            _inFlightImageFences[i] = nullptr;
+        }
+    }
+
+    void VulkanRenderer::cleanupSwapchain() {
+        if( _depthImage ) {
+            delete _depthImage;
+        }
+
+        for( U64 i = 0; i < _swapchainImages.size(); ++i ) {
+            vkDestroyFramebuffer( _device, _swapchainFramebuffers[i], nullptr );
+        }
+
+        // Free the command buffers in the pool, but do not destroy the pool.
+        vkFreeCommandBuffers( _device, _commandPool, (U32)_commandBuffers.size(), _commandBuffers.data() );
+        _commandBuffers.clear();
+
+        vkDestroyPipeline( _device, _pipeline, nullptr );
+        vkDestroyPipelineLayout( _device, _pipelineLayout, nullptr );
+
+        vkDestroyRenderPass( _device, _renderPass, nullptr );
+
+        for( auto scImageView : _swapchainImageViews ) {
+            vkDestroyImageView( _device, scImageView, nullptr );
+        }
+        _swapchainImages.clear();
+
+        vkDestroySwapchainKHR( _device, _swapchain, nullptr );
+
+        // Destroy UBOs
+
+        // Destroy descriptor pool
+    }
+
+    void VulkanRenderer::recreateSwapchain() {
+        if( _recreatingSwapchain ) {
+            return;
+        }
+        _recreatingSwapchain = true;
+        Extent2D extent = _platform->GetFramebufferExtent();
+        while( extent.Width == 0 || extent.Height == 0 ) {
+            extent = _platform->GetFramebufferExtent();
+            _platform->WaitEvents();
+        }
+
+        VK_CHECK( vkDeviceWaitIdle( _device ) );
+
+        // Cleanup the old swapchain.
+        cleanupSwapchain();
+
+        createSwapchain();
+        createSwapchainImagesAndViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createDepthResources();
+        createFramebuffers();
+        //createUniformBuffers();
+        //createDescriptorPool();
+        //createDescriptorSets();
+        createCommandBuffers();
+
+        _recreatingSwapchain = false;
     }
 }

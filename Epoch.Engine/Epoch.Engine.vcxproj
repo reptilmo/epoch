@@ -114,21 +114,28 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="Events\Event.cpp" />
+    <ClCompile Include="Events\EventManager.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Platform.cpp" />
+    <ClCompile Include="VulkanImage.cpp" />
     <ClCompile Include="VulkanRenderer.cpp" />
+    <ClCompile Include="VulkanUtilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Engine.h" />
+    <ClInclude Include="Events\Event.h" />
+    <ClInclude Include="Events\EventManager.h" />
+    <ClInclude Include="Events\IEventHandler.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Platform.h" />
     <ClInclude Include="TMath.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="VulkanImage.h" />
     <ClInclude Include="VulkanRenderer.h" />
-    <ClInclude Include="VulkanUtils.h" />
+    <ClInclude Include="VulkanUtilities.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
