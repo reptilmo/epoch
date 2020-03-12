@@ -4,7 +4,9 @@
 
 #include "Logger.h"
 #include "Engine.h"
-#include "VulkanUtilities.h"
+
+// TODO: move this to renderer layer
+#include "Renderer/Backend/Vulkan/VulkanUtilities.h"
 #include "Platform.h"
 
 namespace Epoch {
