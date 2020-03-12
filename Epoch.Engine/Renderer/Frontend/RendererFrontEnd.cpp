@@ -9,6 +9,7 @@ namespace Epoch {
 
     RendererFrontEnd::RendererFrontEnd( Engine* engine ) {
         _engine = engine;
+        _backend = nullptr;
         Logger::Log( "Created renderer front end." );
     }
 

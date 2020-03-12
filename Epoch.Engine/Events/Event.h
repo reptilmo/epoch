@@ -13,10 +13,27 @@ namespace Epoch {
         EVENT_TYPE_MAX_EVENT_ID
     };
 
+    /**
+     * The base-level event structure to be used with the event system.
+     */
     struct Event {
+
+        /**
+         * This event's type.
+         */
         EventType Type;
+
+        /**
+         * The object which emitted this event.
+         */
         void* Sender;
 
+        /**
+         * Default constructor.
+         * 
+         * @param type The type of this event.
+         * @param sender The object which emitted this event.
+         */
         Event( EventType type, void* sender );
 
         /**
