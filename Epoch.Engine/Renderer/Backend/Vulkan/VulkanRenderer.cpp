@@ -2,10 +2,10 @@
 #include <vector>
 #include <fstream>
 
-#include "Platform.h"
-#include "Logger.h"
-#include "Defines.h"
-#include "TMath.h"
+#include "../../../Platform.h"
+#include "../../../Logger.h"
+#include "../../../Defines.h"
+#include "../../../TMath.h"
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
 
@@ -152,11 +152,17 @@ namespace Epoch {
         vkDestroyInstance( _instance, nullptr );
     }
 
-    void VulkanRenderer::Frame( const F32 deltaTime ) {
+    const bool VulkanRenderer::Initialize() {
+
+
+        return true;
+    }
+
+    const bool VulkanRenderer::Frame( const F32 deltaTime ) {
 
         // If currently recreating the swapchain, boot out.
         if( _recreatingSwapchain ) {
-            return;
+            return true;
         }
 
         // The operations here are asynchronous and not guaranteed to happen in order. Manage
@@ -171,10 +177,10 @@ namespace Epoch {
         if( result == VkResult::VK_ERROR_OUT_OF_DATE_KHR ) {
             // Trigger swapchain recreation, then boot out of the render loop.
             recreateSwapchain();
-            return;
+            return true;
         } else if( result != VkResult::VK_SUCCESS && result != VkResult::VK_SUBOPTIMAL_KHR ) {
-            Logger::Fatal( "Failed to acquire swapchain image!" );
-            return;
+            Logger::Error( "Failed to acquire swapchain image!" );
+            return false;
         }
 
         // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
@@ -263,12 +269,14 @@ namespace Epoch {
             _framebufferResizeOccurred = false;
             recreateSwapchain();
         } else if( result != VkResult::VK_SUCCESS ) {
-            Logger::Fatal( "Failed to present swap chain image!" );
-            return;
+            Logger::Error( "Failed to present swap chain image!" );
+            return false;
         }
 
         // Increment (and loop) the index.
         _currentFrameIndex = ( _currentFrameIndex + 1 ) % _maxFramesInFlight;
+
+        return true;
     }
 
     void VulkanRenderer::OnEvent( const Event& event ) {

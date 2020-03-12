@@ -119,9 +119,10 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Platform.cpp" />
-    <ClCompile Include="VulkanImage.cpp" />
-    <ClCompile Include="VulkanRenderer.cpp" />
-    <ClCompile Include="VulkanUtilities.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanImage.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderer.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanUtilities.cpp" />
+    <ClCompile Include="Renderer\Frontend\RendererFrontEnd.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defines.h" />
@@ -131,11 +132,13 @@
     <ClInclude Include="Events\IEventHandler.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Platform.h" />
+    <ClInclude Include="Renderer\Backend\IRendererBackend.h" />
+    <ClInclude Include="Renderer\Frontend\RendererFrontend.h" />
     <ClInclude Include="TMath.h" />
     <ClInclude Include="Types.h" />
-    <ClInclude Include="VulkanImage.h" />
-    <ClInclude Include="VulkanRenderer.h" />
-    <ClInclude Include="VulkanUtilities.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanImage.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderer.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanUtilities.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

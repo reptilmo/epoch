@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Types.h"
-
-#include "Events/IEventHandler.h"
+#include "../../../Types.h"
+#include "../../../Events/IEventHandler.h"
+#include "../IRendererBackend.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -18,12 +18,14 @@ namespace Epoch {
     class Platform;
     class VulkanImage;
 
-    class VulkanRenderer : public IEventHandler {
+    class VulkanRenderer : public IRendererBackend, IEventHandler {
     public:
         VulkanRenderer( Platform* platform );
         ~VulkanRenderer();
 
-        void Frame( const F32 deltaTime );
+        const bool Initialize() override;
+
+        const bool Frame( const F32 deltaTime ) override;
 
         void OnEvent( const Event& event ) override;
 

@@ -5,7 +5,7 @@
 namespace Epoch {
 
     class Platform;
-    class VulkanRenderer;
+    class RendererFrontEnd;
 
     class Engine {
     public:
@@ -14,10 +14,12 @@ namespace Epoch {
 
         void Run();
 
+        Platform* GetPlatform() { return _platform; }
+
         void OnLoop( const F32 deltaTime );
 
     private:
         Platform* _platform;
-        VulkanRenderer* _renderer;
+        RendererFrontEnd* _renderer;
     };
 }

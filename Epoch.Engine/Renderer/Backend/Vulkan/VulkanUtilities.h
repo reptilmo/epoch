@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include "Defines.h"
-#include "Types.h"
+#include "../../../Defines.h"
+#include "../../../Types.h"
 
 #define VK_CHECK(expr) { \
     ASSERT(expr == VK_SUCCESS); \
