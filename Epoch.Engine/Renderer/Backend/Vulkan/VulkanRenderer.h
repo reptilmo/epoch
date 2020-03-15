@@ -17,11 +17,18 @@ namespace Epoch {
 
     class Platform;
     class VulkanImage;
+    class VulkanVertex3DBuffer;
+    class VulkanIndexBuffer;
 
     class VulkanRenderer : public IRendererBackend, IEventHandler {
     public:
         VulkanRenderer( Platform* platform );
         ~VulkanRenderer();
+
+        VkDevice GetDeviceHandle() { return _device; }
+        VkPhysicalDevice GetPhysicalDeviceHandle() { return _physicalDevice; }
+        VkQueue GetGraphicsQueue() { return _graphicsQueue; }
+        VkCommandPool GetCommandPool() { return _commandPool; }
 
         const bool Initialize() override;
 
@@ -44,10 +51,15 @@ namespace Epoch {
         void createCommandPool();
         void createDepthResources();
         void createFramebuffers();
+        void createDescriptorPool();
+        void createDescriptorSets();
         void createCommandBuffers();
         void createSyncObjects();
         void cleanupSwapchain();
         void recreateSwapchain();
+
+        // Asset loading temp
+        void createBuffers();
     private:
         Platform* _platform;
 
@@ -99,5 +111,13 @@ namespace Epoch {
         std::vector<VkSemaphore> _renderCompleteSemaphores;
         std::vector<VkFence> _inFlightFences;
         std::vector<VkFence> _inFlightImageFences;
+
+        // Descriptor pools/sets
+        VkDescriptorPool _descriptorPool;
+
+
+        // Asset load temp
+        VulkanVertex3DBuffer* _vertexBuffer;
+        VulkanIndexBuffer* _indexBuffer;
     };
 }

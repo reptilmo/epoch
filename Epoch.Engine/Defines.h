@@ -23,6 +23,9 @@
 #ifdef PLATFORM_WINDOWS
 #define FORCEINLINE __forceinline
 #define FORCENOINLINE _declspec(noinline)
+
+// Memory alignment.
+#define ALIGN(n) __declspec(align(n))
 #ifdef Epoch_BUILD_LIB
 #define Epoch_API __declspec(dllexport)
 #else

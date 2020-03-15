@@ -5,9 +5,11 @@
 #include "../../../Platform.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
-#include "../../../TMath.h"
+#include "../../../Math/TMath.h"
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
+#include "VulkanVertex3DBuffer.h"
+#include "VulkanIndexBuffer.h"
 
 #include "VulkanRenderer.h"
 
@@ -134,6 +136,18 @@ namespace Epoch {
 
         createDepthResources();
         createFramebuffers();
+
+        // Asset loading here for now
+
+        // Load texture image/view
+        // Create sampler
+
+        // TODO: load model
+        createBuffers();
+
+        // End asset loading.
+
+
         createCommandBuffers();
         createSyncObjects();
 
@@ -211,10 +225,19 @@ namespace Epoch {
         // Bind the buffer to the graphics pipeline
         vkCmdBindPipeline( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline );
 
-        // Make the draw call. TODO: use object properties
-        vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
+        // Bind vertex buffers
+        VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers( _commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets );
 
-        // TODO: Bind buffers and UBOs here
+        // Bind index buffer
+        vkCmdBindIndexBuffer( _commandBuffers[imageIndex], _indexBuffer->GetHandle(), 0, VK_INDEX_TYPE_UINT32 );
+
+        // TODO: Bind descriptor sets here (UBOs and samplers)
+
+        // Make the draw call. TODO: use object properties
+        //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
+        vkCmdDrawIndexed( _commandBuffers[imageIndex], _indexBuffer->GetElementCount(), 1, 0, 0, 0 );
 
         // End render pass.
         vkCmdEndRenderPass( _commandBuffers[imageIndex] );
@@ -808,10 +831,37 @@ namespace Epoch {
         dynamicStateCreateInfo.dynamicStateCount = 2;
         dynamicStateCreateInfo.pDynamicStates = dynamicStates;
 
+        // Vertex input
+        VkVertexInputBindingDescription bindingDescription;
+        bindingDescription.binding = 0; // Binding index
+        bindingDescription.stride = sizeof( Vertex3D );
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Move to next data entry for each vertex.
+
+        U32 offset = 0;
+        VkVertexInputAttributeDescription attributeDescriptions[3];
+        attributeDescriptions[0].binding = 0; // binding index - should match binding desc
+        attributeDescriptions[0].location = 0; // attrib location
+        attributeDescriptions[0].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
+        attributeDescriptions[0].offset = 0;
+        offset += sizeof( Vector3 );
+
+        attributeDescriptions[1].binding = 0; // binding index - should match binding desc
+        attributeDescriptions[1].location = 1; // attrib location
+        attributeDescriptions[1].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
+        attributeDescriptions[1].offset = offset;
+        offset += sizeof( Vector3 );
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offset;
+        offset += sizeof( Vector2 );
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-        vertexInputInfo.vertexBindingDescriptionCount = 0;
-        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexAttributeDescriptionCount = 3;
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
         // Input assembly
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
@@ -871,6 +921,13 @@ namespace Epoch {
         depthImageCreateInfo.ViewAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 
         VulkanImage::Create( _physicalDevice, _device, depthImageCreateInfo, &_depthImage );
+    }
+
+    void VulkanRenderer::createDescriptorPool() {
+
+    }
+    void VulkanRenderer::createDescriptorSets() {
+
     }
 
     void VulkanRenderer::createFramebuffers() {
@@ -991,5 +1048,29 @@ namespace Epoch {
         createCommandBuffers();
 
         _recreatingSwapchain = false;
+    }
+
+    void VulkanRenderer::createBuffers() {
+        // Vertex buffer.
+        _vertexBuffer = new VulkanVertex3DBuffer( this );
+        // Populate with data
+        std::vector<Vertex3D> verts( 8 );
+        verts[0] = { {-0.5f, -0.5f,  0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
+        verts[1] = { { 0.5f, -0.5f,  0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
+        verts[2] = { { 0.5f,  0.5f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
+        verts[3] = { {-0.5f,  0.5f,  0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };
+        /*verts[4] = { {-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
+        verts[5] = { { 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
+        verts[6] = { { 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
+        verts[7] = { {-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };*/
+        _vertexBuffer->SetData( verts );
+
+        // Index buffer.
+        _indexBuffer = new VulkanIndexBuffer( this );
+        std::vector<U32> indices = {
+            0, 1, 2, 2, 3, 0
+        };
+        _indexBuffer->SetData( indices );
+
     }
 }
