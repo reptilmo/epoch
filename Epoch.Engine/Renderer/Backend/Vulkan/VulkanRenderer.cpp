@@ -5,7 +5,7 @@
 #include "../../../Platform.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
-#include "../../../TMath.h"
+#include "../../../Math/TMath.h"
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
 
