@@ -28,7 +28,7 @@ namespace Epoch {
     const F32 TMath::E = 2.71828182845904523536f;
 
     // The square root of 2
-    const F32 TMath::SQRT_TWO = 1.41421356237309504880f;;
+    const F32 TMath::SQRT_TWO = 1.41421356237309504880f;
 
     // The square root of 3
     const F32 TMath::SQRT_THREE = 1.73205080756887729352f;
@@ -56,7 +56,4 @@ namespace Epoch {
 
     // Smallest positive number where 1.0 + FLOAT_EPSILON != 0
     const F32 TMath::FLOAT_EPSILON = 1.192092896e-07f;
-
-    // Smallest normal 32-bit floating value.
-    const F32 TMath::FLOAT_SMALLEST_NORMAL = *reinterpret_cast<const F32*>( &SMALLEST_NON_DENORMAL ); // 1.1754944e-038f
 }

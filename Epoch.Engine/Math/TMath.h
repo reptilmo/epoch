@@ -16,16 +16,9 @@
 #define I32_SIGN_MASK ( 1UL << I32_SIGN_BIT )
 #define I64_SIGN_MASK ( 1ULL << I64_SIGN_BIT )
 
-#define IEEE_FLT_MANTISSA_BITS 23
-#define IEEE_FLT_EXPONENT_BITS 8
-#define IEEE_FLT_EXPONENT_BIAS 127
-#define IEEE_FLT_SIGN_BIT 31
-
 #ifdef INFINITY
 #undef INFINITY
 #endif
-
-const int SMALLEST_NON_DENORMAL = 1 << IEEE_FLT_MANTISSA_BITS;
 
 template<class T> T Max( T x, T y ) { return ( x > y ) ? x : y; }
 template<class T> T Min( T x, T y ) { return ( x < y ) ? x : y; }
@@ -455,25 +448,6 @@ namespace Epoch {
     // Natural logarithm (64-bit)
     inline F64 TMath::Log( const F64 x ) {
         return log( x );
-    }
-
-    // Integral x raised to the power of y
-    inline int TMath::IPow( int x, int y ) {
-        int r;
-        for( r = x; y > 1; y-- ) {
-            r *= x;
-        }
-        return r;
-    }
-
-    // Integral base-2 logarithm of the provided floating point value.
-    inline int TMath::ILog2( F32 x ) {
-        return ( ( ( *reinterpret_cast<int*>( &x ) ) >> IEEE_FLT_MANTISSA_BITS )& ( ( 1 << IEEE_FLT_EXPONENT_BITS ) - 1 ) ) - IEEE_FLT_EXPONENT_BIAS;
-    }
-
-    // Integral base-2 logarithm of the provided floating point value.
-    inline int TMath::ILog2( I32 x ) {
-        return ( ( ( *reinterpret_cast<int*>( &x ) ) >> IEEE_FLT_MANTISSA_BITS )& ( ( 1 << IEEE_FLT_EXPONENT_BITS ) - 1 ) ) - IEEE_FLT_EXPONENT_BIAS;
     }
 
     // Round x down to the nearest power of 2.

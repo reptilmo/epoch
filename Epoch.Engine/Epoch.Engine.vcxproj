@@ -128,8 +128,10 @@
     <ClCompile Include="Math\Vector4.cpp" />
     <ClCompile Include="Platform.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanImage.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanUtilities.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.cpp" />
     <ClCompile Include="Renderer\Frontend\RendererFrontEnd.cpp" />
     <ClCompile Include="String\StringUtilities.cpp" />
   </ItemGroup>
@@ -152,7 +154,11 @@
     <ClInclude Include="Math\Vector4.h" />
     <ClInclude Include="Platform.h" />
     <ClInclude Include="Renderer\Backend\IRendererBackend.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanBuffer.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.h" />
     <ClInclude Include="Renderer\Frontend\RendererFrontend.h" />
+    <ClInclude Include="Renderer\Vertex3D.h" />
     <ClInclude Include="String\StringUtilities.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanImage.h" />
