@@ -84,7 +84,7 @@ namespace Epoch {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _buffer, _memory );
 
         // Perform the copy.
-        VulkanUtilities::CopyBuffer( device, _renderer->GetGraphicsQueue(), stagingBuffer, _buffer, bufferSize, _renderer->GetCommandPool() );
+        VulkanUtilities::CopyBuffer( _renderer, stagingBuffer, _buffer, bufferSize, _renderer->GetCommandPool() );
 
         // Clean up the staging buffer and memory.
         vkDestroyBuffer( device, stagingBuffer, nullptr );

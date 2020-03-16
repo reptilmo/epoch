@@ -6,6 +6,9 @@
 #include "../../../Logger.h"
 #include "../../../Defines.h"
 #include "../../../Math/TMath.h"
+
+#include "../../../Assets/Image/ImageUtilities.h"
+
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
 #include "VulkanVertex3DBuffer.h"
@@ -140,13 +143,18 @@ namespace Epoch {
         // Asset loading here for now
 
         // Load texture image/view
+        createTextureImageAndView();
         // Create sampler
+        createTextureSampler();
 
         // TODO: load model
         createBuffers();
 
         // End asset loading.
 
+        // Create UBOs
+        // Create descriptor pool
+        // Create descriptor sets.
 
         createCommandBuffers();
         createSyncObjects();
@@ -311,6 +319,44 @@ namespace Epoch {
         default:
             break;
         }
+    }
+
+    VkCommandBuffer VulkanRenderer::AllocateAndBeginSingleUseCommandBuffer() {
+        VkCommandBufferAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = _commandPool;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer;
+        VK_CHECK( vkAllocateCommandBuffers( _device, &allocInfo, &commandBuffer ) );
+
+        // Mark the buffer as only being used once.
+        VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        // Begin recording.
+        VK_CHECK( vkBeginCommandBuffer( commandBuffer, &beginInfo ) );
+
+        return commandBuffer;
+    }
+
+    void VulkanRenderer::EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer ) {
+        // End recording
+        VK_CHECK( vkEndCommandBuffer( commandBuffer ) );
+
+        // Prepare to submit
+        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        // NOTE: May want to set up a new queue for this.
+        VK_CHECK( vkQueueSubmit( _graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
+
+        // Wait for the queue to finish
+        VK_CHECK( vkQueueWaitIdle( _graphicsQueue ) );
+
+        // Free the command buffer
+        vkFreeCommandBuffers( _device, _commandPool, 1, &commandBuffer );
     }
 
     VkPhysicalDevice VulkanRenderer::selectPhysicalDevice() {
@@ -920,7 +966,7 @@ namespace Epoch {
         depthImageCreateInfo.CreateView = true;
         depthImageCreateInfo.ViewAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        VulkanImage::Create( _physicalDevice, _device, depthImageCreateInfo, &_depthImage );
+        VulkanImage::Create( this, depthImageCreateInfo, &_depthImage );
     }
 
     void VulkanRenderer::createDescriptorPool() {
@@ -1071,6 +1117,73 @@ namespace Epoch {
             0, 1, 2, 2, 3, 0
         };
         _indexBuffer->SetData( indices );
+    }
 
+    void VulkanRenderer::createTextureImageAndView() {
+        I32 width, height, channelCount;
+        byte* pixels = ImageUtilities::LoadImage( "assets/textures/test512.png", &width, &height, &channelCount );
+        ASSERT_MSG( pixels, "Unable to load image!" );
+
+        VkDeviceSize imageSize = (U64)( width * height * 4 );
+
+        // Create a staging buffer and load data into it.
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        VulkanUtilities::CreateBuffer( _physicalDevice, _device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory );
+
+        void* data;
+        VK_CHECK( vkMapMemory( _device, stagingBufferMemory, 0, imageSize, 0, &data ) );
+        memcpy( data, pixels, imageSize );
+        vkUnmapMemory( _device, stagingBufferMemory );
+
+        // Clean up image data.
+        free( pixels );
+
+        VulkanImageCreateInfo textureImageCreateInfo = {};
+        textureImageCreateInfo.Width = width;
+        textureImageCreateInfo.Height = height;
+        textureImageCreateInfo.Format = VkFormat::VK_FORMAT_R8G8B8A8_SRGB;
+        textureImageCreateInfo.Tiling = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
+        textureImageCreateInfo.Usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+        textureImageCreateInfo.Properties = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        textureImageCreateInfo.CreateView = true;
+        textureImageCreateInfo.ViewAspectFlags = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+        VulkanImage::Create( this, textureImageCreateInfo, &_textureImage );
+
+        // Transition the layout from whatever it is currently to optimal for recieving data.
+        _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+        // Copy the data from the buffer.
+        _textureImage->CopyFromBuffer( stagingBuffer );
+
+        // Transition from optimal for data reciept to shader-read-only optimal layout.
+        _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+
+        // Cleanup the staging buffer.
+        vkDestroyBuffer( _device, stagingBuffer, nullptr );
+        vkFreeMemory( _device, stagingBufferMemory, nullptr );
+    }
+
+    void VulkanRenderer::createTextureSampler() {
+        VkSamplerCreateInfo samplerInfo = {};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = 16;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        VK_CHECK( vkCreateSampler( _device, &samplerInfo, nullptr, &_textureSampler ) );
     }
 }

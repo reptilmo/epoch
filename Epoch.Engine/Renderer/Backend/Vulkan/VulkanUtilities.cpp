@@ -1,6 +1,7 @@
 
 #include "../../../Logger.h"
 
+#include "VulkanRenderer.h"
 #include "VulkanUtilities.h"
 
 namespace Epoch {
@@ -74,22 +75,9 @@ namespace Epoch {
         VK_CHECK( vkBindBufferMemory( device, buffer, memory, 0 ) );
     }
 
-    void VulkanUtilities::CopyBuffer( VkDevice device, VkQueue queue, VkBuffer source, VkBuffer destination, VkDeviceSize size, VkCommandPool commandPool ) {
+    void VulkanUtilities::CopyBuffer( VulkanRenderer* renderer, VkBuffer source, VkBuffer destination, VkDeviceSize size, VkCommandPool commandPool ) {
         // Create a one-time use command buffer
-        VkCommandBufferAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = commandPool;
-        allocInfo.commandBufferCount = 1; 
-
-        VkCommandBuffer commandBuffer;
-        VK_CHECK( vkAllocateCommandBuffers( device, &allocInfo, &commandBuffer ) );
-
-        // Mark the buffer as only being used once.
-        VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        // Begin recording.
-        VK_CHECK( vkBeginCommandBuffer( commandBuffer, &beginInfo ) );
+        VkCommandBuffer commandBuffer = renderer->AllocateAndBeginSingleUseCommandBuffer();
 
         // Write the copy command.
         VkBufferCopy copyRegion = {};
@@ -98,20 +86,6 @@ namespace Epoch {
         copyRegion.size = size;
         vkCmdCopyBuffer( commandBuffer, source, destination, 1, &copyRegion );
 
-        // End recording
-        VK_CHECK( vkEndCommandBuffer( commandBuffer ) );
-
-        // Prepare to submit
-        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-
-        VK_CHECK( vkQueueSubmit( queue, 1, &submitInfo, VK_NULL_HANDLE ) );
-
-        // Wait for the queue to finish
-        VK_CHECK( vkQueueWaitIdle( queue ) );
-
-        // Free the command buffer
-        vkFreeCommandBuffers( device, commandPool, 1, &commandBuffer );
+        renderer->EndSingleUseCommandBuffer( commandBuffer );
     }
 }

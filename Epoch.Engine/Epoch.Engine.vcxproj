@@ -72,7 +72,7 @@
       <AdditionalDependencies>glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>$(SolutionDir)tools\compile-shaders.bat $(SolutionDir)</Command>
+      <Command>$(SolutionDir)tools\post-build.bat $(SolutionDir)</Command>
       <Message>Post build...</Message>
     </PostBuildEvent>
     <CustomBuildStep>
@@ -101,7 +101,7 @@
       <AdditionalDependencies>glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>$(SolutionDir)tools\compile-shaders.bat $(SolutionDir)</Command>
+      <Command>$(SolutionDir)tools\post-build.bat $(SolutionDir)</Command>
       <Message>Post build...</Message>
     </PostBuildEvent>
     <CustomBuildStep>
@@ -113,6 +113,7 @@
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Assets\Image\ImageUtilities.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Events\Event.cpp" />
     <ClCompile Include="Events\EventManager.cpp" />
@@ -141,6 +142,7 @@
     <ClInclude Include="Events\Event.h" />
     <ClInclude Include="Events\EventManager.h" />
     <ClInclude Include="Events\IEventHandler.h" />
+    <ClInclude Include="External\stb_image\stb_image.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Math\Matrix4x4.h" />
     <ClInclude Include="Math\Quaternion.h" />
@@ -154,6 +156,7 @@
     <ClInclude Include="Math\Vector4.h" />
     <ClInclude Include="Platform.h" />
     <ClInclude Include="Renderer\Backend\IRendererBackend.h" />
+    <ClInclude Include="Assets\Image\ImageUtilities.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.h" />

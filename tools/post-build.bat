@@ -11,4 +11,8 @@ glslc.exe -fshader-stage=vert %1shaders/main.vert.glsl -o %1build/shaders/main.v
 echo "%1shaders/main.frag.glsl -> %1build/shaders/main.frag.spv"
 glslc.exe -fshader-stage=frag %1shaders/main.frag.glsl -o %1build/shaders/main.frag.spv
 
+echo "Copying assets..."
+echo xcopy "%1assets" "%1build\assets" /h /i /c /k /e /r /y
+xcopy "%1assets" "%1build\assets" /h /i /c /k /e /r /y
+
 echo "Done."
