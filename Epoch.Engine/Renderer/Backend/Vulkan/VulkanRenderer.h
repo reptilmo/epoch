@@ -20,7 +20,7 @@ namespace Epoch {
     class VulkanVertex3DBuffer;
     class VulkanIndexBuffer;
     class VulkanImage;
-
+    class VulkanUniformBuffer;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
@@ -42,7 +42,7 @@ namespace Epoch {
          * Allocates and begins recording of a single use command buffer. This is useful for copying
          * from a staging buffer or for transitioning image layouts. Note that a call to EndSingleUseCommandBuffer
          * should be made when ready to submit for execution.
-         * 
+         *
          * @return A pointer to the newly-allocated command buffer.
          */
         VkCommandBuffer AllocateAndBeginSingleUseCommandBuffer();
@@ -68,6 +68,9 @@ namespace Epoch {
         void createCommandPool();
         void createDepthResources();
         void createFramebuffers();
+        void createUniformBuffers();
+        void updateUniformBuffers( U32 currentImageIndex );
+        void createDescriptorSetLayout();
         void createDescriptorPool();
         void createDescriptorSets();
         void createCommandBuffers();
@@ -133,6 +136,11 @@ namespace Epoch {
 
         // Descriptor pools/sets
         VkDescriptorPool _descriptorPool;
+        VkDescriptorSetLayout _descriptorSetLayout;
+        std::vector<VkDescriptorSet> _descriptorSets;
+
+        // 1 per swap chain image.
+        std::vector<VulkanUniformBuffer*> _uniformBuffers;
 
 
         // Asset load temp
