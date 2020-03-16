@@ -19,8 +19,10 @@ namespace Epoch {
     class VulkanImage;
     class VulkanVertex3DBuffer;
     class VulkanIndexBuffer;
+    class VulkanImage;
+    class VulkanUniformBuffer;
 
-    class VulkanRenderer : public IRendererBackend, IEventHandler {
+    class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
         VulkanRenderer( Platform* platform );
         ~VulkanRenderer();
@@ -35,6 +37,21 @@ namespace Epoch {
         const bool Frame( const F32 deltaTime ) override;
 
         void OnEvent( const Event& event ) override;
+
+        /**
+         * Allocates and begins recording of a single use command buffer. This is useful for copying
+         * from a staging buffer or for transitioning image layouts. Note that a call to EndSingleUseCommandBuffer
+         * should be made when ready to submit for execution.
+         *
+         * @return A pointer to the newly-allocated command buffer.
+         */
+        VkCommandBuffer AllocateAndBeginSingleUseCommandBuffer();
+
+        /**
+         * Ends recording of the given command buffer and submits it for execution. This function
+         * waits until the execution of the queue is complete, then frees it before returning.
+         */
+        void EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer );
 
     private:
         VkPhysicalDevice selectPhysicalDevice();
@@ -51,6 +68,9 @@ namespace Epoch {
         void createCommandPool();
         void createDepthResources();
         void createFramebuffers();
+        void createUniformBuffers();
+        void updateUniformBuffers( U32 currentImageIndex );
+        void createDescriptorSetLayout();
         void createDescriptorPool();
         void createDescriptorSets();
         void createCommandBuffers();
@@ -60,6 +80,8 @@ namespace Epoch {
 
         // Asset loading temp
         void createBuffers();
+        void createTextureImageAndView();
+        void createTextureSampler();
     private:
         Platform* _platform;
 
@@ -114,10 +136,17 @@ namespace Epoch {
 
         // Descriptor pools/sets
         VkDescriptorPool _descriptorPool;
+        VkDescriptorSetLayout _descriptorSetLayout;
+        std::vector<VkDescriptorSet> _descriptorSets;
+
+        // 1 per swap chain image.
+        std::vector<VulkanUniformBuffer*> _uniformBuffers;
 
 
         // Asset load temp
         VulkanVertex3DBuffer* _vertexBuffer;
         VulkanIndexBuffer* _indexBuffer;
+        VulkanImage* _textureImage;
+        VkSampler _textureSampler;
     };
 }

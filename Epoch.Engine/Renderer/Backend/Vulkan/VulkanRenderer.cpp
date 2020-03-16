@@ -2,14 +2,26 @@
 #include <vector>
 #include <fstream>
 
+// TODO: temp
+#include <chrono>
+
 #include "../../../Platform.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
 #include "../../../Math/TMath.h"
+#include "../../../Math/Rotator.h"
+#include "../../../Math/Matrix4x4.h"
+#include "../../../Math/Vector3.h"
+#include "../../../Math/Quaternion.h"
+
+#include "../../../Assets/Image/ImageUtilities.h"
+#include "../../StandardUniformBufferObject.h"
+
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
 #include "VulkanVertex3DBuffer.h"
 #include "VulkanIndexBuffer.h"
+#include "VulkanUniformBuffer.h"
 
 #include "VulkanRenderer.h"
 
@@ -130,6 +142,8 @@ namespace Epoch {
 
         createRenderPass();
 
+        createDescriptorSetLayout();
+
         createGraphicsPipeline();
 
         createCommandPool();
@@ -140,13 +154,19 @@ namespace Epoch {
         // Asset loading here for now
 
         // Load texture image/view
+        createTextureImageAndView();
         // Create sampler
+        createTextureSampler();
 
         // TODO: load model
         createBuffers();
 
         // End asset loading.
 
+        // Create UBOs
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
 
         createCommandBuffers();
         createSyncObjects();
@@ -233,7 +253,8 @@ namespace Epoch {
         // Bind index buffer
         vkCmdBindIndexBuffer( _commandBuffers[imageIndex], _indexBuffer->GetHandle(), 0, VK_INDEX_TYPE_UINT32 );
 
-        // TODO: Bind descriptor sets here (UBOs and samplers)
+        // Bind descriptor sets (UBOs and samplers)
+        vkCmdBindDescriptorSets( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1, &_descriptorSets[imageIndex], 0, nullptr );
 
         // Make the draw call. TODO: use object properties
         //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
@@ -254,6 +275,8 @@ namespace Epoch {
 
         // Mark the image fence as in-use by this frame.
         _inFlightImageFences[_currentFrameIndex] = _inFlightFences[_currentFrameIndex];
+
+        updateUniformBuffers( imageIndex );
 
         // Submit the queue and wait for the operation to complete.
         VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
@@ -311,6 +334,44 @@ namespace Epoch {
         default:
             break;
         }
+    }
+
+    VkCommandBuffer VulkanRenderer::AllocateAndBeginSingleUseCommandBuffer() {
+        VkCommandBufferAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = _commandPool;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer;
+        VK_CHECK( vkAllocateCommandBuffers( _device, &allocInfo, &commandBuffer ) );
+
+        // Mark the buffer as only being used once.
+        VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        // Begin recording.
+        VK_CHECK( vkBeginCommandBuffer( commandBuffer, &beginInfo ) );
+
+        return commandBuffer;
+    }
+
+    void VulkanRenderer::EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer ) {
+        // End recording
+        VK_CHECK( vkEndCommandBuffer( commandBuffer ) );
+
+        // Prepare to submit
+        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        // NOTE: May want to set up a new queue for this.
+        VK_CHECK( vkQueueSubmit( _graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
+
+        // Wait for the queue to finish
+        VK_CHECK( vkQueueWaitIdle( _graphicsQueue ) );
+
+        // Free the command buffer
+        vkFreeCommandBuffers( _device, _commandPool, 1, &commandBuffer );
     }
 
     VkPhysicalDevice VulkanRenderer::selectPhysicalDevice() {
@@ -863,15 +924,15 @@ namespace Epoch {
         vertexInputInfo.vertexAttributeDescriptionCount = 3;
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
-        // Input assembly
+        // Input assembly 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
         inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         inputAssembly.primitiveRestartEnable = VK_FALSE;
 
         // Pipeline layout
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        pipelineLayoutCreateInfo.setLayoutCount = 0;
-        pipelineLayoutCreateInfo.pSetLayouts = nullptr;
+        pipelineLayoutCreateInfo.setLayoutCount = 1;
+        pipelineLayoutCreateInfo.pSetLayouts = &_descriptorSetLayout;
         pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
         VK_CHECK( vkCreatePipelineLayout( _device, &pipelineLayoutCreateInfo, nullptr, &_pipelineLayout ) );
@@ -920,14 +981,136 @@ namespace Epoch {
         depthImageCreateInfo.CreateView = true;
         depthImageCreateInfo.ViewAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        VulkanImage::Create( _physicalDevice, _device, depthImageCreateInfo, &_depthImage );
+        VulkanImage::Create( this, depthImageCreateInfo, &_depthImage );
+    }
+
+    void VulkanRenderer::createUniformBuffers() {
+        VkDeviceSize bufferSize = sizeof( StandardUniformBufferObject );
+
+        U64 swapchainImageCount = _swapchainImages.size();
+        _uniformBuffers.resize( swapchainImageCount );
+
+        for( U64 i = 0; i < swapchainImageCount; ++i ) {
+            _uniformBuffers[i] = new VulkanUniformBuffer( this );
+            std::vector<StandardUniformBufferObject> udata( 1 );
+            _uniformBuffers[i]->SetData( udata );
+        }
+    }
+
+    void VulkanRenderer::updateUniformBuffers( U32 currentImageIndex ) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        F32 time = std::chrono::duration<F32, std::chrono::seconds::period>( currentTime - startTime ).count();
+
+        StandardUniformBufferObject ubo = {};
+        Rotator rotator;
+        rotator.Pitch = time * 90.0f;
+        rotator.Roll = 90.0f;
+        ubo.Model = Matrix4x4::Identity();
+        ubo.Model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
+        ubo.Model *= rotator.ToQuaternion().ToMatrix4x4();
+        ubo.View = Matrix4x4::LookAt( Vector3( 0.0f, 2.0f, 2.0f ), Vector3::Zero(), Vector3::Up() );
+        ubo.Projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)_swapchainExtent.width / (F32)_swapchainExtent.height, 0.1f, 1000.0f );
+
+        // For now, since this happens every frame, just push to the buffer directly.
+        void* data = _uniformBuffers[currentImageIndex]->Map( sizeof( ubo ) );
+        //VK_CHECK( vkMapMemory( _device, _uniformBuffersMemory[currentImage], 0, sizeof( ubo ), 0, &data ) );
+        memcpy( data, &ubo, sizeof( ubo ) );
+        _uniformBuffers[currentImageIndex]->Unmap();
+        //vkUnmapMemory( _device->GetInternal(), _uniformBuffersMemory[currentImage] );
+    }
+
+    void VulkanRenderer::createDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+        samplerLayoutBinding.binding = 1;
+        samplerLayoutBinding.descriptorCount = 1;
+        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerLayoutBinding.pImmutableSamplers = nullptr;
+        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutBinding bindings[2] = {
+            uboLayoutBinding,
+            samplerLayoutBinding
+        };
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = (U32)2;
+        layoutInfo.pBindings = bindings;
+
+        VK_CHECK( vkCreateDescriptorSetLayout( _device, &layoutInfo, nullptr, &_descriptorSetLayout ) );
     }
 
     void VulkanRenderer::createDescriptorPool() {
+        VkDescriptorPoolSize poolSizes[2];
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = (U32)_swapchainImages.size();
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[1].descriptorCount = (U32)_swapchainImages.size();;
 
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 2;
+        poolInfo.pPoolSizes = poolSizes;
+        poolInfo.maxSets = (U32)_swapchainImages.size();
+
+        VK_CHECK( vkCreateDescriptorPool( _device, &poolInfo, nullptr, &_descriptorPool ) );
     }
     void VulkanRenderer::createDescriptorSets() {
+        U64 swapchainImageCount = _swapchainImages.size();
+        // Fill an array with pointers to the descriptor set layout.
+        std::vector<VkDescriptorSetLayout> layouts( swapchainImageCount, _descriptorSetLayout );
 
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = _descriptorPool;
+        allocInfo.descriptorSetCount = swapchainImageCount;
+        allocInfo.pSetLayouts = layouts.data();
+
+        _descriptorSets.resize( _swapchainImages.size() );
+        VK_CHECK( vkAllocateDescriptorSets( _device, &allocInfo, _descriptorSets.data() ) );
+
+        // Configure the descriptors.
+        for( U64 i = 0; i < swapchainImageCount; ++i ) {
+            VkDescriptorBufferInfo bufferInfo = {};
+            bufferInfo.buffer = _uniformBuffers[i]->GetHandle();
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof( StandardUniformBufferObject );
+
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = _textureImage->GetView();
+            imageInfo.sampler = _textureSampler;
+
+            std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = _descriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].pNext = nullptr;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // For a UBO
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = _descriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].pNext = nullptr;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &imageInfo;
+
+            vkUpdateDescriptorSets( _device, 2, descriptorWrites.data(), 0, nullptr );
+        }
     }
 
     void VulkanRenderer::createFramebuffers() {
@@ -1042,9 +1225,9 @@ namespace Epoch {
         createGraphicsPipeline();
         createDepthResources();
         createFramebuffers();
-        //createUniformBuffers();
-        //createDescriptorPool();
-        //createDescriptorSets();
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
         createCommandBuffers();
 
         _recreatingSwapchain = false;
@@ -1071,6 +1254,73 @@ namespace Epoch {
             0, 1, 2, 2, 3, 0
         };
         _indexBuffer->SetData( indices );
+    }
 
+    void VulkanRenderer::createTextureImageAndView() {
+        I32 width, height, channelCount;
+        byte* pixels = ImageUtilities::LoadImage( "assets/textures/test512.png", &width, &height, &channelCount );
+        ASSERT_MSG( pixels, "Unable to load image!" );
+
+        VkDeviceSize imageSize = (U64)( width * height * 4 );
+
+        // Create a staging buffer and load data into it.
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        VulkanUtilities::CreateBuffer( _physicalDevice, _device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory );
+
+        void* data;
+        VK_CHECK( vkMapMemory( _device, stagingBufferMemory, 0, imageSize, 0, &data ) );
+        memcpy( data, pixels, imageSize );
+        vkUnmapMemory( _device, stagingBufferMemory );
+
+        // Clean up image data.
+        free( pixels );
+
+        VulkanImageCreateInfo textureImageCreateInfo = {};
+        textureImageCreateInfo.Width = width;
+        textureImageCreateInfo.Height = height;
+        textureImageCreateInfo.Format = VkFormat::VK_FORMAT_R8G8B8A8_SRGB;
+        textureImageCreateInfo.Tiling = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
+        textureImageCreateInfo.Usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+        textureImageCreateInfo.Properties = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        textureImageCreateInfo.CreateView = true;
+        textureImageCreateInfo.ViewAspectFlags = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+        VulkanImage::Create( this, textureImageCreateInfo, &_textureImage );
+
+        // Transition the layout from whatever it is currently to optimal for recieving data.
+        _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+
+        // Copy the data from the buffer.
+        _textureImage->CopyFromBuffer( stagingBuffer );
+
+        // Transition from optimal for data reciept to shader-read-only optimal layout.
+        _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+
+        // Cleanup the staging buffer.
+        vkDestroyBuffer( _device, stagingBuffer, nullptr );
+        vkFreeMemory( _device, stagingBufferMemory, nullptr );
+    }
+
+    void VulkanRenderer::createTextureSampler() {
+        VkSamplerCreateInfo samplerInfo = {};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = 16;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        VK_CHECK( vkCreateSampler( _device, &samplerInfo, nullptr, &_textureSampler ) );
     }
 }

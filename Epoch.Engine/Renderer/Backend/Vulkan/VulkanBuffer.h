@@ -41,6 +41,9 @@ namespace Epoch {
 
         virtual void SetData( std::vector<T> data );
 
+        void* Map( U64 size );
+        void Unmap();
+
     private:
         VkBufferUsageFlagBits getUsageFlag();
         U32 _elementCount;
@@ -80,15 +83,33 @@ namespace Epoch {
 
         // Setup a device-local buffer as the actual buffer. Data will be copied to this from the staging buffer. Mark it as
         // the destination of the transfer.
-        VulkanUtilities::CreateBuffer( physicalDevice, device, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsageFlag(), 
+        if( _buffer ) {
+            // Destroy if already exists.
+            vkDestroyBuffer( device, _buffer, nullptr );
+            vkFreeMemory( device, _memory, nullptr );
+        }
+
+        VulkanUtilities::CreateBuffer( physicalDevice, device, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | getUsageFlag(),
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _buffer, _memory );
 
         // Perform the copy.
-        VulkanUtilities::CopyBuffer( device, _renderer->GetGraphicsQueue(), stagingBuffer, _buffer, bufferSize, _renderer->GetCommandPool() );
+        VulkanUtilities::CopyBuffer( _renderer, stagingBuffer, _buffer, bufferSize, _renderer->GetCommandPool() );
 
         // Clean up the staging buffer and memory.
         vkDestroyBuffer( device, stagingBuffer, nullptr );
         vkFreeMemory( device, stagingBufferMemory, nullptr );
+    }
+
+    template<class T>
+    void* VulkanBuffer<T>::Map( U64 size ) {
+        void* data;
+        VK_CHECK( vkMapMemory( _renderer->GetDeviceHandle(), _memory, 0, size, 0, &data ) );
+        return data;
+    }
+
+    template<class T>
+    void VulkanBuffer<T>::Unmap() {
+        vkUnmapMemory( _renderer->GetDeviceHandle(), _memory );
     }
 
     template <class T>
