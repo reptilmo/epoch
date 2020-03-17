@@ -153,10 +153,12 @@ namespace Epoch {
 
         // Asset loading here for now
 
-        // Load texture image/view
-        createTextureImageAndView();
-        // Create sampler
-        createTextureSampler();
+        // Load texture image/views
+        createTextureImageAndView( "assets/textures/test512.png", &_textureImages[0] );
+        createTextureImageAndView( "assets/textures/testice.jpg", &_textureImages[1] );
+        // Create samplers
+        createTextureSampler( &_textureSamplers[0] );
+        createTextureSampler( &_textureSamplers[1] );
 
         // TODO: load model
         createBuffers();
@@ -167,6 +169,10 @@ namespace Epoch {
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
+        U64 swapchainImageCount = _swapchainImages.size();
+        for( U64 i = 0; i < swapchainImageCount; ++i ) {
+            updateDescriptorSet( i, _textureImages[_currentTextureIndex], _textureSamplers[_currentTextureIndex] );
+        }
 
         createCommandBuffers();
         createSyncObjects();
@@ -216,6 +222,15 @@ namespace Epoch {
             Logger::Error( "Failed to acquire swapchain image!" );
             return false;
         }
+
+        // Update descriptors if need be. TEST: Swap texture
+        // Must happen before queue is started below.
+        _updatesTemp++;
+        if( _updatesTemp > 3000 ) {
+            _currentTextureIndex = ( _currentTextureIndex == 0 ? 1 : 0 );
+            _updatesTemp = 0;
+        }
+        updateDescriptorSet( imageIndex, _textureImages[_currentTextureIndex], _textureSamplers[_currentTextureIndex] );
 
         // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
         // Prepare commands for the queue.
@@ -277,6 +292,8 @@ namespace Epoch {
         _inFlightImageFences[_currentFrameIndex] = _inFlightFences[_currentFrameIndex];
 
         updateUniformBuffers( imageIndex );
+
+
 
         // Submit the queue and wait for the operation to complete.
         VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
@@ -1077,40 +1094,41 @@ namespace Epoch {
 
         _descriptorSets.resize( _swapchainImages.size() );
         VK_CHECK( vkAllocateDescriptorSets( _device, &allocInfo, _descriptorSets.data() ) );
+    }
 
-        // Configure the descriptors.
-        for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            VkDescriptorBufferInfo bufferInfo = {};
-            bufferInfo.buffer = _uniformBuffers[i]->GetHandle();
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof( StandardUniformBufferObject );
+    void VulkanRenderer::updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VkSampler sampler ) {
 
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = _textureImage->GetView();
-            imageInfo.sampler = _textureSampler;
+        // Configure the descriptors for the given index..
+        VkDescriptorBufferInfo bufferInfo = {};
+        bufferInfo.buffer = _uniformBuffers[descriptorSetIndex]->GetHandle();
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof( StandardUniformBufferObject );
 
-            std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
-            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = _descriptorSets[i];
-            descriptorWrites[0].dstBinding = 0;
-            descriptorWrites[0].dstArrayElement = 0;
-            descriptorWrites[0].pNext = nullptr;
-            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // For a UBO
-            descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = textureImage->GetView();
+        imageInfo.sampler = sampler;
 
-            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = _descriptorSets[i];
-            descriptorWrites[1].dstBinding = 1;
-            descriptorWrites[1].dstArrayElement = 0;
-            descriptorWrites[1].pNext = nullptr;
-            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrites[1].descriptorCount = 1;
-            descriptorWrites[1].pImageInfo = &imageInfo;
+        std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = _descriptorSets[descriptorSetIndex];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].pNext = nullptr;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // For a UBO
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
 
-            vkUpdateDescriptorSets( _device, 2, descriptorWrites.data(), 0, nullptr );
-        }
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = _descriptorSets[descriptorSetIndex];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].pNext = nullptr;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets( _device, 2, descriptorWrites.data(), 0, nullptr );
     }
 
     void VulkanRenderer::createFramebuffers() {
@@ -1228,6 +1246,10 @@ namespace Epoch {
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
+        U64 swapchainImageCount = _swapchainImages.size();
+        for( U64 i = 0; i < swapchainImageCount; ++i ) {
+            updateDescriptorSet( i, _textureImages[_currentTextureIndex], _textureSamplers[_currentTextureIndex] );
+        }
         createCommandBuffers();
 
         _recreatingSwapchain = false;
@@ -1256,9 +1278,9 @@ namespace Epoch {
         _indexBuffer->SetData( indices );
     }
 
-    void VulkanRenderer::createTextureImageAndView() {
+    void VulkanRenderer::createTextureImageAndView( const char* path, VulkanImage** textureImage ) {
         I32 width, height, channelCount;
-        byte* pixels = ImageUtilities::LoadImage( "assets/textures/test512.png", &width, &height, &channelCount );
+        byte* pixels = ImageUtilities::LoadImage( path, &width, &height, &channelCount );
         ASSERT_MSG( pixels, "Unable to load image!" );
 
         VkDeviceSize imageSize = (U64)( width * height * 4 );
@@ -1286,23 +1308,23 @@ namespace Epoch {
         textureImageCreateInfo.Properties = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
         textureImageCreateInfo.CreateView = true;
         textureImageCreateInfo.ViewAspectFlags = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-        VulkanImage::Create( this, textureImageCreateInfo, &_textureImage );
+        VulkanImage::Create( this, textureImageCreateInfo, &*textureImage );
 
         // Transition the layout from whatever it is currently to optimal for recieving data.
-        _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+        ( *textureImage )->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 
         // Copy the data from the buffer.
-        _textureImage->CopyFromBuffer( stagingBuffer );
+        ( *textureImage )->CopyFromBuffer( stagingBuffer );
 
         // Transition from optimal for data reciept to shader-read-only optimal layout.
-        _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+        ( *textureImage )->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
         // Cleanup the staging buffer.
         vkDestroyBuffer( _device, stagingBuffer, nullptr );
         vkFreeMemory( _device, stagingBufferMemory, nullptr );
     }
 
-    void VulkanRenderer::createTextureSampler() {
+    void VulkanRenderer::createTextureSampler( VkSampler* sampler ) {
         VkSamplerCreateInfo samplerInfo = {};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -1321,6 +1343,6 @@ namespace Epoch {
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = 0.0f;
 
-        VK_CHECK( vkCreateSampler( _device, &samplerInfo, nullptr, &_textureSampler ) );
+        VK_CHECK( vkCreateSampler( _device, &samplerInfo, nullptr, &*sampler ) );
     }
 }

@@ -73,6 +73,7 @@ namespace Epoch {
         void createDescriptorSetLayout();
         void createDescriptorPool();
         void createDescriptorSets();
+        void updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VkSampler sampler );
         void createCommandBuffers();
         void createSyncObjects();
         void cleanupSwapchain();
@@ -80,8 +81,8 @@ namespace Epoch {
 
         // Asset loading temp
         void createBuffers();
-        void createTextureImageAndView();
-        void createTextureSampler();
+        void createTextureImageAndView( const char* path, VulkanImage** textureImage );
+        void createTextureSampler( VkSampler* sampler );
     private:
         Platform* _platform;
 
@@ -146,7 +147,11 @@ namespace Epoch {
         // Asset load temp
         VulkanVertex3DBuffer* _vertexBuffer;
         VulkanIndexBuffer* _indexBuffer;
-        VulkanImage* _textureImage;
-        VkSampler _textureSampler;
+
+        // textures
+        U64 _updatesTemp = 0;
+        U64 _currentTextureIndex = 0;
+        VulkanImage* _textureImages[2];
+        VkSampler _textureSamplers[2];
     };
 }
