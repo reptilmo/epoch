@@ -1,5 +1,7 @@
 #pragma once
 
+#include <xhash>
+
 #include "../Types.h"
 
 namespace Epoch {
@@ -249,5 +251,17 @@ namespace Epoch {
          * @return The extracted vector.
          */
         static Vector2 FromString( const char* str );
+    };
+}
+
+namespace std {
+
+    // Required for used in unordered_map
+    template<> struct hash<Epoch::Vector2> {
+        size_t operator() ( Epoch::Vector2 const& vertex ) const {
+
+            // Reference: https://en.cppreference.com/w/cpp/utility/hash
+            return hash<F32>()( vertex.X ) ^ ( hash<F32>()( vertex.Y ) << 1 );
+        }
     };
 }

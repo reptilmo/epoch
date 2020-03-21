@@ -14,43 +14,24 @@
 #include "../../../Math/Vector3.h"
 #include "../../../Math/Quaternion.h"
 
-#include "../../../Assets/Image/ImageUtilities.h"
 #include "../../StandardUniformBufferObject.h"
+#include "../../../Resources/ITexture.h"
+
+// TODO: temp
+#include "../../../Assets/StaticMesh/StaticMesh.h"
+#include "../../../Assets/StaticMesh/Loaders/OBJLoader.h"
 
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
+#include "VulkanTexture.h"
 #include "VulkanVertex3DBuffer.h"
 #include "VulkanIndexBuffer.h"
 #include "VulkanUniformBuffer.h"
+#include "VulkanDebugger.h"
 
 #include "VulkanRenderer.h"
 
 namespace Epoch {
-
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT           messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData ) {
-
-        switch( messageSeverity ) {
-        default:
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-            Logger::Error( pCallbackData->pMessage );
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-            Logger::Warn( pCallbackData->pMessage );
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-            Logger::Log( pCallbackData->pMessage );
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-            Logger::Trace( pCallbackData->pMessage );
-            break;
-        }
-
-        return VK_FALSE;
-    }
 
     VulkanRenderer::VulkanRenderer( Platform* platform ) {
         _platform = platform;
@@ -115,15 +96,7 @@ namespace Epoch {
         VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );
 
         // Create debugger
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-        debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT, VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
-        debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-        debugCreateInfo.pfnUserCallback = debugCallback;
-        debugCreateInfo.pUserData = this;
-
-        PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr( _instance, "vkCreateDebugUtilsMessengerEXT" );
-        ASSERT_MSG( func, "Failed to create debug messenger!" );
-        func( _instance, &debugCreateInfo, nullptr, &_debugMessenger );
+        _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
 
         // Create the surface
         _platform->CreateSurface( _instance, &_surface );
@@ -154,8 +127,9 @@ namespace Epoch {
         // Asset loading here for now
 
         // Load texture image/views
-        createTextureImageAndView( "assets/textures/test512.png", &_textureImages[0] );
-        createTextureImageAndView( "assets/textures/testice.jpg", &_textureImages[1] );
+        _textures[0] = (VulkanTexture*)GetTexture( "assets/textures/test512.png" );
+        _textures[1] = (VulkanTexture*)GetTexture( "assets/textures/testice.jpg" );
+
         // Create samplers
         createTextureSampler( &_textureSamplers[0] );
         createTextureSampler( &_textureSamplers[1] );
@@ -171,7 +145,7 @@ namespace Epoch {
         createDescriptorSets();
         U64 swapchainImageCount = _swapchainImages.size();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            updateDescriptorSet( i, _textureImages[_currentTextureIndex], _textureSamplers[_currentTextureIndex] );
+            updateDescriptorSet( i, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }
 
         createCommandBuffers();
@@ -183,10 +157,9 @@ namespace Epoch {
 
     VulkanRenderer::~VulkanRenderer() {
 
-        if( _debugMessenger ) {
-            PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr( _instance, "vkDestroyDebugUtilsMessengerEXT" );
-            // ASSERT_MSG( func, "Failed to destroy debug messenger!" );
-            func( _instance, _debugMessenger, nullptr );
+        if( _debugger ) {
+            delete _debugger;
+            _debugger = nullptr;
         }
 
         vkDestroyInstance( _instance, nullptr );
@@ -230,7 +203,7 @@ namespace Epoch {
             _currentTextureIndex = ( _currentTextureIndex == 0 ? 1 : 0 );
             _updatesTemp = 0;
         }
-        updateDescriptorSet( imageIndex, _textureImages[_currentTextureIndex], _textureSamplers[_currentTextureIndex] );
+        updateDescriptorSet( imageIndex, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
 
         // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
         // Prepare commands for the queue.
@@ -249,7 +222,7 @@ namespace Epoch {
 
         // TODO: Clear colour and depth based on configuration.
         VkClearValue clearValues[2] = {};
-        clearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+        clearValues[0].color = { 0.0f, 0.0f, 0.2f, 0.0f };
         clearValues[1].depthStencil = { 1.0f, 0 };
         renderPassBeginInfo.clearValueCount = 2;
         renderPassBeginInfo.pClearValues = clearValues;
@@ -260,20 +233,27 @@ namespace Epoch {
         // Bind the buffer to the graphics pipeline
         vkCmdBindPipeline( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline );
 
-        // Bind vertex buffers
-        VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
-        VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers( _commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets );
+        // TODO: These should be provided by the front end instead.
+        auto vertexBufferRanges = _vertexBuffer->GetDataRanges();
+        auto indexBufferRanges = _indexBuffer->GetDataRanges();
 
-        // Bind index buffer
-        vkCmdBindIndexBuffer( _commandBuffers[imageIndex], _indexBuffer->GetHandle(), 0, VK_INDEX_TYPE_UINT32 );
+        for( U64 i = 0; i < vertexBufferRanges.size(); ++i ) {
+            // Bind vertex buffers
+            VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
+            VkDeviceSize offsets[] = { vertexBufferRanges[i].Offset }; // was 0
+            vkCmdBindVertexBuffers( _commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets );
 
-        // Bind descriptor sets (UBOs and samplers)
-        vkCmdBindDescriptorSets( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1, &_descriptorSets[imageIndex], 0, nullptr );
+            // Bind index buffer
+            vkCmdBindIndexBuffer( _commandBuffers[imageIndex], _indexBuffer->GetHandle(), indexBufferRanges[i].Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
 
-        // Make the draw call. TODO: use object properties
-        //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
-        vkCmdDrawIndexed( _commandBuffers[imageIndex], _indexBuffer->GetElementCount(), 1, 0, 0, 0 );
+            // Bind descriptor sets (UBOs and samplers)
+            vkCmdBindDescriptorSets( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1, &_descriptorSets[imageIndex], 0, nullptr );
+
+            // Make the draw call. TODO: use object properties
+            //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
+
+            vkCmdDrawIndexed( _commandBuffers[imageIndex], indexBufferRanges[i].ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
+        }
 
         // End render pass.
         vkCmdEndRenderPass( _commandBuffers[imageIndex] );
@@ -391,6 +371,11 @@ namespace Epoch {
         vkFreeCommandBuffers( _device, _commandPool, 1, &commandBuffer );
     }
 
+    ITexture* VulkanRenderer::GetTexture( const char* path ) {
+        // TODO: Should probably get by name somehow.
+        return new VulkanTexture( this, path, path );
+    }
+
     VkPhysicalDevice VulkanRenderer::selectPhysicalDevice() {
         U32 deviceCount = 0;
         vkEnumeratePhysicalDevices( _instance, &deviceCount, nullptr );
@@ -401,7 +386,48 @@ namespace Epoch {
         vkEnumeratePhysicalDevices( _instance, &deviceCount, devices.data() );
 
         for( U32 i = 0; i < deviceCount; ++i ) {
-            if( physicalDeviceMeetsRequirements( devices[i] ) ) {
+            VkPhysicalDeviceProperties properties;
+            vkGetPhysicalDeviceProperties( devices[i], &properties );
+
+            VkPhysicalDeviceFeatures features;
+            vkGetPhysicalDeviceFeatures( devices[i], &features );
+
+            VkPhysicalDeviceMemoryProperties memoryProperties;
+            vkGetPhysicalDeviceMemoryProperties( devices[i], &memoryProperties );
+
+            if( physicalDeviceMeetsRequirements( devices[i], &properties, &features ) ) {
+
+                // Print some info about the GPU
+                Logger::Log( "Selected device: %s", properties.deviceName );
+                switch( properties.deviceType ) {
+                default:
+                case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+                    Logger::Log( "Unknown GPU type" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                    Logger::Log( "Integrated GPU" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                    Logger::Log( "Descrete GPU" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                    Logger::Log( "Virtual GPU" );
+                    break;
+                case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                    Logger::Log( "CPU 'GPU' type" );
+                    break;
+                }
+
+                // Memory info
+                for( U32 i = 0; i < memoryProperties.memoryHeapCount; ++i ) {
+                    F32 memorySizeMiB = ( ( (F32)memoryProperties.memoryHeaps[i].size ) / 1024.0f / 1024.0f );
+                    if( memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
+                        Logger::Log( "Local GPU memory: %.2f MiB", memorySizeMiB );
+                    } else {
+                        Logger::Log( "Shared System memory: %.2f MiB", memorySizeMiB );
+                    }
+                }
+
                 return devices[i];
             }
         }
@@ -410,17 +436,11 @@ namespace Epoch {
         return nullptr;
     }
 
-    const bool VulkanRenderer::physicalDeviceMeetsRequirements( VkPhysicalDevice physicalDevice ) {
+    const bool VulkanRenderer::physicalDeviceMeetsRequirements( VkPhysicalDevice physicalDevice, const VkPhysicalDeviceProperties* properties, const VkPhysicalDeviceFeatures* features ) {
         I32 graphicsQueueIndex = -1;
         I32 presentationQueueIndex = -1;
         detectQueueFamilyIndices( physicalDevice, &graphicsQueueIndex, &presentationQueueIndex );
         VulkanSwapchainSupportDetails swapchainSupport = querySwapchainSupport( physicalDevice );
-
-        VkPhysicalDeviceProperties properties;
-        vkGetPhysicalDeviceProperties( physicalDevice, &properties );
-
-        VkPhysicalDeviceFeatures features;
-        vkGetPhysicalDeviceFeatures( physicalDevice, &features );
 
         bool supportsRequiredQueueFamilies = ( graphicsQueueIndex != -1 ) && ( presentationQueueIndex != -1 );
 
@@ -455,7 +475,7 @@ namespace Epoch {
         }
 
         // NOTE: Could also look for discrete GPU. We could score and rank them based on features and capabilities.
-        return supportsRequiredQueueFamilies && swapChainMeetsRequirements && features.samplerAnisotropy;
+        return supportsRequiredQueueFamilies && swapChainMeetsRequirements && features->samplerAnisotropy;
     }
 
     void VulkanRenderer::detectQueueFamilyIndices( VkPhysicalDevice physicalDevice, I32* graphicsQueueIndex, I32* presentationQueueIndex ) {
@@ -860,8 +880,8 @@ namespace Epoch {
         rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;
         rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizerCreateInfo.lineWidth = 1.0f;
-        rasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;// VK_CULL_MODE_BACK_BIT;
+        rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; //VK_FRONT_FACE_COUNTER_CLOCKWISE // VK_FRONT_FACE_CLOCKWISE
         rasterizerCreateInfo.depthBiasEnable = VK_FALSE;
         rasterizerCreateInfo.depthBiasConstantFactor = 0.0f;
         rasterizerCreateInfo.depthBiasClamp = 0.0f;
@@ -916,7 +936,7 @@ namespace Epoch {
         bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Move to next data entry for each vertex.
 
         U32 offset = 0;
-        VkVertexInputAttributeDescription attributeDescriptions[3];
+        VkVertexInputAttributeDescription attributeDescriptions[4];
         attributeDescriptions[0].binding = 0; // binding index - should match binding desc
         attributeDescriptions[0].location = 0; // attrib location
         attributeDescriptions[0].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
@@ -935,10 +955,17 @@ namespace Epoch {
         attributeDescriptions[2].offset = offset;
         offset += sizeof( Vector2 );
 
+        // Color
+        attributeDescriptions[3].binding = 0; // binding index - should match binding desc
+        attributeDescriptions[3].location = 3; // attrib location
+        attributeDescriptions[3].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
+        attributeDescriptions[3].offset = offset;
+        offset += sizeof( Vector3 );
+
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
         vertexInputInfo.vertexBindingDescriptionCount = 1;
         vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-        vertexInputInfo.vertexAttributeDescriptionCount = 3;
+        vertexInputInfo.vertexAttributeDescriptionCount = 4;
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
         // Input assembly 
@@ -956,7 +983,7 @@ namespace Epoch {
 
         // Pipeline create
         VkGraphicsPipelineCreateInfo pipelineCreateInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-        pipelineCreateInfo.stageCount = _shaderStageCount;
+        pipelineCreateInfo.stageCount = (U32)_shaderStageCount;
         pipelineCreateInfo.pStages = _shaderStages.data();
         pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
         pipelineCreateInfo.pInputAssemblyState = &inputAssembly;;
@@ -1022,12 +1049,12 @@ namespace Epoch {
 
         StandardUniformBufferObject ubo = {};
         Rotator rotator;
-        rotator.Pitch = time * 90.0f;
+        rotator.Pitch = time * 90.0f * 0.1f;
         rotator.Roll = 90.0f;
         ubo.Model = Matrix4x4::Identity();
         ubo.Model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
         ubo.Model *= rotator.ToQuaternion().ToMatrix4x4();
-        ubo.View = Matrix4x4::LookAt( Vector3( 0.0f, 2.0f, 2.0f ), Vector3::Zero(), Vector3::Up() );
+        ubo.View = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
         ubo.Projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)_swapchainExtent.width / (F32)_swapchainExtent.height, 0.1f, 1000.0f );
 
         // For now, since this happens every frame, just push to the buffer directly.
@@ -1089,7 +1116,7 @@ namespace Epoch {
         VkDescriptorSetAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = _descriptorPool;
-        allocInfo.descriptorSetCount = swapchainImageCount;
+        allocInfo.descriptorSetCount = (U32)swapchainImageCount;
         allocInfo.pSetLayouts = layouts.data();
 
         _descriptorSets.resize( _swapchainImages.size() );
@@ -1248,7 +1275,7 @@ namespace Epoch {
         createDescriptorSets();
         U64 swapchainImageCount = _swapchainImages.size();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            updateDescriptorSet( i, _textureImages[_currentTextureIndex], _textureSamplers[_currentTextureIndex] );
+            updateDescriptorSet( i, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }
         createCommandBuffers();
 
@@ -1256,72 +1283,64 @@ namespace Epoch {
     }
 
     void VulkanRenderer::createBuffers() {
+        // Populate with data
+        //std::vector<Vertex3D> verts( 8 );
+        //verts[0] = { {-0.5f, -0.5f,  0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
+        //verts[1] = { { 0.5f, -0.5f,  0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
+        //verts[2] = { { 0.5f,  0.5f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
+        //verts[3] = { {-0.5f,  0.5f,  0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };
+        //verts[4] = { {-0.5f, -0.5f,  -1.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
+        //verts[5] = { { 0.5f, -0.5f,  -1.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
+        //verts[6] = { { 0.5f,  0.5f,  1.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
+        //verts[7] = { {-0.5f,  0.5f,  -1.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };
+
+        //std::vector<U32> indices = {
+        //    0, 1, 2, 2, 3, 0,
+        //    4, 5, 6, 6, 7, 4
+        //};
+
+        //// Vertex buffer.
+        //_vertexBuffer = new VulkanVertex3DBuffer( this );
+        //_vertexBuffer->SetData( verts );
+
+        //// Index buffer.
+        //_indexBuffer = new VulkanIndexBuffer( this );
+        //_indexBuffer->SetData( indices );
+
+        // Load from obj.
+        std::vector<StaticMesh> meshes = OBJLoader::LoadObjFile( "assets/models/sibenik.obj" );
+
+        // For now, just get the total size needed for the meshes.
+        U64 totalVertSize = 0;
+        U64 totalIndexSize = 0;
+        for( auto mesh : meshes ) {
+            totalVertSize += ( sizeof( Vertex3D ) * mesh.Vertices.size() );
+            totalIndexSize += ( sizeof( U32 ) * mesh.Indices.size() );
+        }
+        Logger::Log( "Mesh verts require %.2f MiB", ( (F32)totalVertSize / 1024.0f / 1024.0f ) );
+        Logger::Log( "Mesh indices require %.2f MiB", ( (F32)totalIndexSize / 1024.0f / 1024.0f ) );
+
         // Vertex buffer.
         _vertexBuffer = new VulkanVertex3DBuffer( this );
-        // Populate with data
-        std::vector<Vertex3D> verts( 8 );
-        verts[0] = { {-0.5f, -0.5f,  0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
-        verts[1] = { { 0.5f, -0.5f,  0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
-        verts[2] = { { 0.5f,  0.5f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
-        verts[3] = { {-0.5f,  0.5f,  0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };
-        /*verts[4] = { {-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
-        verts[5] = { { 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
-        verts[6] = { { 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
-        verts[7] = { {-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };*/
-        _vertexBuffer->SetData( verts );
+        // Allocate 128 MiB for the vertex buffer
+        _vertexBuffer->Allocate( 128 * 1024 * 1024 );
 
         // Index buffer.
         _indexBuffer = new VulkanIndexBuffer( this );
-        std::vector<U32> indices = {
-            0, 1, 2, 2, 3, 0
-        };
-        _indexBuffer->SetData( indices );
-    }
+        // Allocate 32 MiB for the index buffer.
+        _indexBuffer->Allocate( 32 * 1024 * 1024 );
 
-    void VulkanRenderer::createTextureImageAndView( const char* path, VulkanImage** textureImage ) {
-        I32 width, height, channelCount;
-        byte* pixels = ImageUtilities::LoadImage( path, &width, &height, &channelCount );
-        ASSERT_MSG( pixels, "Unable to load image!" );
-
-        VkDeviceSize imageSize = (U64)( width * height * 4 );
-
-        // Create a staging buffer and load data into it.
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        VulkanUtilities::CreateBuffer( _physicalDevice, _device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory );
-
-        void* data;
-        VK_CHECK( vkMapMemory( _device, stagingBufferMemory, 0, imageSize, 0, &data ) );
-        memcpy( data, pixels, imageSize );
-        vkUnmapMemory( _device, stagingBufferMemory );
-
-        // Clean up image data.
-        free( pixels );
-
-        VulkanImageCreateInfo textureImageCreateInfo = {};
-        textureImageCreateInfo.Width = width;
-        textureImageCreateInfo.Height = height;
-        textureImageCreateInfo.Format = VkFormat::VK_FORMAT_R8G8B8A8_SRGB;
-        textureImageCreateInfo.Tiling = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
-        textureImageCreateInfo.Usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-        textureImageCreateInfo.Properties = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        textureImageCreateInfo.CreateView = true;
-        textureImageCreateInfo.ViewAspectFlags = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-        VulkanImage::Create( this, textureImageCreateInfo, &*textureImage );
-
-        // Transition the layout from whatever it is currently to optimal for recieving data.
-        ( *textureImage )->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
-
-        // Copy the data from the buffer.
-        ( *textureImage )->CopyFromBuffer( stagingBuffer );
-
-        // Transition from optimal for data reciept to shader-read-only optimal layout.
-        ( *textureImage )->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-
-        // Cleanup the staging buffer.
-        vkDestroyBuffer( _device, stagingBuffer, nullptr );
-        vkFreeMemory( _device, stagingBufferMemory, nullptr );
+        U64 vertOffset = 0;
+        U64 indexOffset = 0;
+        for( auto mesh : meshes ) {
+            if( mesh.Vertices.size() == 0 || mesh.Indices.size() == 0 ) {
+                continue;
+            }
+            _vertexBuffer->SetDataRange( mesh.Vertices, vertOffset );
+            _indexBuffer->SetDataRange( mesh.Indices, indexOffset );
+            vertOffset += ( sizeof( Vertex3D ) * mesh.Vertices.size() );
+            indexOffset += ( sizeof( U32 ) * mesh.Indices.size() );
+        }
     }
 
     void VulkanRenderer::createTextureSampler( VkSampler* sampler ) {

@@ -15,12 +15,15 @@ namespace Epoch {
         std::vector<VkPresentModeKHR> PresentationModes;
     };
 
-    class Platform;
-    class VulkanImage;
+    class ITexture;
+
+    class Platform;    
     class VulkanVertex3DBuffer;
     class VulkanIndexBuffer;
     class VulkanImage;
+    class VulkanTexture;
     class VulkanUniformBuffer;
+    class VulkanDebugger;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
@@ -53,9 +56,11 @@ namespace Epoch {
          */
         void EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer );
 
+        ITexture* GetTexture( const char* path );
+
     private:
         VkPhysicalDevice selectPhysicalDevice();
-        const bool physicalDeviceMeetsRequirements( VkPhysicalDevice physicalDevice );
+        const bool physicalDeviceMeetsRequirements( VkPhysicalDevice physicalDevice, const VkPhysicalDeviceProperties* properties, const VkPhysicalDeviceFeatures* features );
         void detectQueueFamilyIndices( VkPhysicalDevice physicalDevice, I32* graphicsQueueIndex, I32* presentationQueueIndex );
         VulkanSwapchainSupportDetails querySwapchainSupport( VkPhysicalDevice physicalDevice );
         void createLogicalDevice( std::vector<const char*>& requiredValidationLayers );
@@ -81,14 +86,13 @@ namespace Epoch {
 
         // Asset loading temp
         void createBuffers();
-        void createTextureImageAndView( const char* path, VulkanImage** textureImage );
         void createTextureSampler( VkSampler* sampler );
     private:
         Platform* _platform;
 
         VkInstance _instance;
 
-        VkDebugUtilsMessengerEXT _debugMessenger;
+        VulkanDebugger* _debugger;
 
         VkPhysicalDevice _physicalDevice;
         VkDevice _device; // Logical device 
@@ -151,7 +155,7 @@ namespace Epoch {
         // textures
         U64 _updatesTemp = 0;
         U64 _currentTextureIndex = 0;
-        VulkanImage* _textureImages[2];
+        VulkanTexture* _textures[2];
         VkSampler _textureSamplers[2];
     };
 }

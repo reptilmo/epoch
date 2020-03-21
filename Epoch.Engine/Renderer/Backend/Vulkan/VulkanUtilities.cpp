@@ -88,4 +88,18 @@ namespace Epoch {
 
         renderer->EndSingleUseCommandBuffer( commandBuffer );
     }
+
+    void VulkanUtilities::CopyBufferOffset( VulkanRenderer* renderer, VkBuffer source, U64 sourceOffset, VkBuffer destination, U64 destinationOffset, VkDeviceSize size, VkCommandPool commandPool ) {
+        // Create a one-time use command buffer
+        VkCommandBuffer commandBuffer = renderer->AllocateAndBeginSingleUseCommandBuffer();
+
+        // Write the copy command.
+        VkBufferCopy copyRegion = {};
+        copyRegion.srcOffset = sourceOffset;
+        copyRegion.dstOffset = destinationOffset;
+        copyRegion.size = size;
+        vkCmdCopyBuffer( commandBuffer, source, destination, 1, &copyRegion );
+
+        renderer->EndSingleUseCommandBuffer( commandBuffer );
+    }
 }
