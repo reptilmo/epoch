@@ -4,11 +4,11 @@
 
 namespace Epoch {
 
-    class VulkanRenderer;
+    class VulkanDevice;
 
     class VulkanIndexBuffer : public VulkanBuffer<U32> {
     public:
-        VulkanIndexBuffer( VulkanRenderer* renderer );
+        VulkanIndexBuffer( VulkanDevice* device );
         ~VulkanIndexBuffer();
 
         void SetData( std::vector<U32> data );

@@ -20,12 +20,12 @@ namespace Epoch {
         VkImageAspectFlags ViewAspectFlags;
     };
 
-    class VulkanRenderer;
+    class VulkanDevice;
 
     class VulkanImage {
     public:
-        void static Create( VulkanRenderer* renderer, VulkanImageCreateInfo& createInfo, VulkanImage** image );
-        void static CreateView( VulkanRenderer* renderer, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView* view );
+        void static Create( VulkanDevice* device, VulkanImageCreateInfo& createInfo, VulkanImage** image );
+        void static CreateView( VulkanDevice* device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView* view );
 
     public:
         void TransitionLayout( VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout );
@@ -39,10 +39,10 @@ namespace Epoch {
         const bool HasView() { return _view != nullptr; }
         VkImageView GetView() { return _view; }
     protected:
-        VulkanImage( VulkanRenderer* renderer, U32 width, U32 height, VkImage imageHandle, VkDeviceMemory imageMemory, VkImageView view );
+        VulkanImage( VulkanDevice* device, U32 width, U32 height, VkImage imageHandle, VkDeviceMemory imageMemory, VkImageView view );
     private:
         U32 _width, _height;
-        VulkanRenderer* _renderer;
+        VulkanDevice* _device;
         VkImage _imageHandle;
         VkDeviceMemory _imageMemory;
         VkImageView _view;

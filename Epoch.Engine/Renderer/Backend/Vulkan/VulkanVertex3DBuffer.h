@@ -5,11 +5,11 @@
 
 namespace Epoch {
 
-    class VulkanRenderer;
+    class VulkanDevice;
 
     class VulkanVertex3DBuffer : public VulkanBuffer<Vertex3D> {
     public:
-        VulkanVertex3DBuffer( VulkanRenderer* renderer );
+        VulkanVertex3DBuffer( VulkanDevice* device );
         ~VulkanVertex3DBuffer();
 
         void SetData( std::vector<Vertex3D> data );

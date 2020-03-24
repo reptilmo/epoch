@@ -3,7 +3,7 @@
 
 namespace Epoch {
 
-    VulkanVertex3DBuffer::VulkanVertex3DBuffer( VulkanRenderer* renderer ) : VulkanBuffer( renderer, VulkanBufferType::VERTEX ) {
+    VulkanVertex3DBuffer::VulkanVertex3DBuffer( VulkanDevice* device ) : VulkanBuffer( device, VulkanBufferType::VERTEX ) {
 
     }
 
