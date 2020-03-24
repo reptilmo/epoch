@@ -3,7 +3,7 @@
 
 namespace Epoch {
 
-    VulkanUniformBuffer::VulkanUniformBuffer( VulkanRenderer* renderer ) : VulkanBuffer( renderer, VulkanBufferType::UNIFORM ) {
+    VulkanUniformBuffer::VulkanUniformBuffer( VulkanDevice* device ) : VulkanBuffer( device, VulkanBufferType::UNIFORM ) {
 
     }
 

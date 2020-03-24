@@ -8,11 +8,11 @@
 
 namespace Epoch {
 
-    class VulkanRenderer;
+    class VulkanDevice;
 
     class VulkanUniformBuffer : public VulkanBuffer<Epoch::StandardUniformBufferObject> {
     public:
-        VulkanUniformBuffer( VulkanRenderer* renderer );
+        VulkanUniformBuffer( VulkanDevice* device );
         ~VulkanUniformBuffer();
 
         void SetData( std::vector<Epoch::StandardUniformBufferObject> data );

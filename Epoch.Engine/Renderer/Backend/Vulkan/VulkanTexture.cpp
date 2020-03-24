@@ -2,20 +2,21 @@
 #include <vulkan/vulkan.h>
 
 #include "../../../Defines.h"
+#include "../../../Memory/Memory.h"
 #include "../../../Assets/Image/ImageUtilities.h"
 
 #include "VulkanRenderer.h"
 #include "VulkanUtilities.h"
+#include "VulkanInternalBuffer.h"
 #include "VulkanImage.h"
 #include "VulkanTexture.h"
 
 namespace Epoch {
 
-    VulkanTexture::VulkanTexture( VulkanRenderer* renderer, const char* name, const char* path ) {
-        _renderer = renderer;
+    VulkanTexture::VulkanTexture( VulkanDevice* device, const char* name, const char* path ) {
+        _device = device;
         _name = name;
 
-        VkDevice device = _renderer->GetDeviceHandle();
 
         I32 width, height, channelCount;
         byte* pixels = ImageUtilities::LoadImage( path, &width, &height, &channelCount );
@@ -24,18 +25,17 @@ namespace Epoch {
         VkDeviceSize imageSize = (U64)width * (U64)height * 4;
 
         // Create a staging buffer and load data into it.
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        VulkanUtilities::CreateBuffer( _renderer->GetPhysicalDeviceHandle(), device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory );
+        VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        VulkanInternalBuffer staging( _device, imageSize, usage, flags, true );
 
-        void* data;
-        VK_CHECK( vkMapMemory( device, stagingBufferMemory, 0, imageSize, 0, &data ) );
-        memcpy( data, pixels, imageSize );
-        vkUnmapMemory( device, stagingBufferMemory );
+        // Lock, copy, unlock
+        void* data = staging.LockMemory( 0, imageSize, 0 );
+        TMemory::Memcpy( data, pixels, imageSize );
+        staging.UnlockMemory();
 
         // Clean up image data.
-        free( pixels );
+        TMemory::Free( pixels );
 
         VulkanImageCreateInfo textureImageCreateInfo = {};
         textureImageCreateInfo.Width = width;
@@ -46,20 +46,16 @@ namespace Epoch {
         textureImageCreateInfo.Properties = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
         textureImageCreateInfo.CreateView = true;
         textureImageCreateInfo.ViewAspectFlags = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-        VulkanImage::Create( _renderer, textureImageCreateInfo, &_textureImage );
+        VulkanImage::Create( _device, textureImageCreateInfo, &_textureImage );
 
         // Transition the layout from whatever it is currently to optimal for recieving data.
         _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 
         // Copy the data from the buffer.
-        _textureImage->CopyFromBuffer( stagingBuffer );
+        _textureImage->CopyFromBuffer( staging.GetHandle() );
 
         // Transition from optimal for data reciept to shader-read-only optimal layout.
         _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-
-        // Cleanup the staging buffer.
-        vkDestroyBuffer( device, stagingBuffer, nullptr );
-        vkFreeMemory( device, stagingBufferMemory, nullptr );
     }
 
     VulkanTexture::~VulkanTexture() {
@@ -68,6 +64,6 @@ namespace Epoch {
             _textureImage = nullptr;
         }
 
-        _renderer = nullptr;
+        _device = nullptr;
     }
 }

@@ -5,11 +5,11 @@
 namespace Epoch {
 
     class VulkanImage;
-    class VulkanRenderer;
+    class VulkanDevice;
 
     class VulkanTexture : public ITexture {
     public:
-        VulkanTexture( VulkanRenderer* renderer, const char* name, const char* path );
+        VulkanTexture( VulkanDevice* device, const char* name, const char* path );
         ~VulkanTexture();
 
         const char* GetName() const { return _name; }
@@ -17,7 +17,7 @@ namespace Epoch {
         VulkanImage* GetImage() { return _textureImage; }
 
     private:
-        VulkanRenderer* _renderer;
+        VulkanDevice* _device;
         const char* _name;
         VulkanImage* _textureImage;
     };

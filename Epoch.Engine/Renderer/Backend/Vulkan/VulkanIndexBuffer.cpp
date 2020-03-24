@@ -3,7 +3,7 @@
 
 namespace Epoch {
 
-    VulkanIndexBuffer::VulkanIndexBuffer( VulkanRenderer* renderer ) : VulkanBuffer( renderer, VulkanBufferType::INDEX ) {
+    VulkanIndexBuffer::VulkanIndexBuffer( VulkanDevice* device ) : VulkanBuffer( device, VulkanBufferType::INDEX ) {
 
     }
 

@@ -9,11 +9,7 @@
 
 namespace Epoch {
 
-    struct VulkanSwapchainSupportDetails {
-        VkSurfaceCapabilitiesKHR Capabilities;
-        std::vector<VkSurfaceFormatKHR> Formats;
-        std::vector<VkPresentModeKHR> PresentationModes;
-    };
+    
 
     class ITexture;
 
@@ -24,16 +20,14 @@ namespace Epoch {
     class VulkanTexture;
     class VulkanUniformBuffer;
     class VulkanDebugger;
+    class VulkanDevice;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
         VulkanRenderer( Platform* platform );
         ~VulkanRenderer();
 
-        VkDevice GetDeviceHandle() { return _device; }
-        VkPhysicalDevice GetPhysicalDeviceHandle() { return _physicalDevice; }
-        VkQueue GetGraphicsQueue() { return _graphicsQueue; }
-        VkCommandPool GetCommandPool() { return _commandPool; }
+        VulkanDevice* GetDevice() { return _device; }
 
         const bool Initialize() override;
 
@@ -41,36 +35,16 @@ namespace Epoch {
 
         void OnEvent( const Event& event ) override;
 
-        /**
-         * Allocates and begins recording of a single use command buffer. This is useful for copying
-         * from a staging buffer or for transitioning image layouts. Note that a call to EndSingleUseCommandBuffer
-         * should be made when ready to submit for execution.
-         *
-         * @return A pointer to the newly-allocated command buffer.
-         */
-        VkCommandBuffer AllocateAndBeginSingleUseCommandBuffer();
-
-        /**
-         * Ends recording of the given command buffer and submits it for execution. This function
-         * waits until the execution of the queue is complete, then frees it before returning.
-         */
-        void EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer );
-
         ITexture* GetTexture( const char* path );
 
     private:
-        VkPhysicalDevice selectPhysicalDevice();
-        const bool physicalDeviceMeetsRequirements( VkPhysicalDevice physicalDevice, const VkPhysicalDeviceProperties* properties, const VkPhysicalDeviceFeatures* features );
-        void detectQueueFamilyIndices( VkPhysicalDevice physicalDevice, I32* graphicsQueueIndex, I32* presentationQueueIndex );
-        VulkanSwapchainSupportDetails querySwapchainSupport( VkPhysicalDevice physicalDevice );
-        void createLogicalDevice( std::vector<const char*>& requiredValidationLayers );
         void createShader( const char* name );
         char* readShaderFile( const char* filename, const char* shaderType, U64* fileSize );
         void createSwapchain();
         void createSwapchainImagesAndViews();
         void createRenderPass();
         void createGraphicsPipeline();
-        void createCommandPool();
+        
         void createDepthResources();
         void createFramebuffers();
         void createUniformBuffers();
@@ -91,20 +65,16 @@ namespace Epoch {
         Platform* _platform;
 
         VkInstance _instance;
+        VulkanDevice* _device;
 
         VulkanDebugger* _debugger;
-
-        VkPhysicalDevice _physicalDevice;
-        VkDevice _device; // Logical device 
-        I32 _graphicsFamilyQueueIndex;
-        I32 _presentationFamilyQueueIndex;
-        VkQueue _graphicsQueue;
-        VkQueue _presentationQueue;
 
         VkSurfaceKHR _surface;
 
         U64 _shaderStageCount;
         std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
+        VkShaderModule _vertexShaderModule;
+        VkShaderModule _fragmentShaderModule;
 
         VkSurfaceFormatKHR _swapchainImageFormat;
         VkExtent2D _swapchainExtent;
@@ -116,8 +86,6 @@ namespace Epoch {
         VkRenderPass _renderPass;
         VkPipelineLayout _pipelineLayout;
         VkPipeline _pipeline;
-
-        VkCommandPool _commandPool;
 
         // Depth image.
         VkFormat _depthFormat;

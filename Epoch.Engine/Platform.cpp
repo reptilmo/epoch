@@ -53,6 +53,8 @@ namespace Epoch {
             _engine->OnLoop( 0 );
         }
 
+        WaitEvents();
+
         return true;
     }
 
