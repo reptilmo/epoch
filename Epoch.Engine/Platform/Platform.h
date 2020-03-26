@@ -1,14 +1,15 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include "Types.h"
-#include "Events/Event.h"
+#include "../Types.h"
+#include "../Events/Event.h"
 
 struct GLFWwindow;
 
 namespace Epoch {
 
     class Engine;
+    class IWindow;
 
     /**
      * A specialized event used to signal a window resize having occurred.
@@ -64,8 +65,20 @@ namespace Epoch {
     public:
 
         /**
+         * Creates and returns a pointer to a new window.
+         *
+         * @param applicationName The name of the application. Used in the window title.
+         * @param width The number of pixels wide the client area of the window will be.
+         * @param height The number of pixels high the client area of the window will be.
+         *
+         * @returns A pointer to the window.
+         */
+        static IWindow* CreateWindow( const char* applicationName, U32 width, U32 height );
+    public:
+
+        /**
          * Creates a new Platform instance.
-         * 
+         *
          * @param engine A pointer to the Engine instance which owns this object.
          * @param applicationName The name of the application. Used in the window title.
          */
@@ -124,5 +137,7 @@ namespace Epoch {
     private:
         Engine* _engine;
         GLFWwindow* _window;
+
+        friend class TGLFWWindow;
     };
 }

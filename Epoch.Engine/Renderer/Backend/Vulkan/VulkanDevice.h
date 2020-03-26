@@ -3,6 +3,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include "../../../Types.h"
+
 namespace Epoch {
 
     struct VulkanSwapchainSupportDetails {
@@ -62,6 +64,11 @@ namespace Epoch {
          *The format to be used for depth images/attachments.
          */
         VkFormat DepthFormat;
+
+        /**
+         * TODO: Stop-gap until platform is removed.
+         */
+        Extent2D FramebufferSize;
 
     public:
         /**

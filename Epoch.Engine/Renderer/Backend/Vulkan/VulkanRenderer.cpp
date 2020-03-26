@@ -5,7 +5,7 @@
 // TODO: temp
 #include <chrono>
 
-#include "../../../Platform.h"
+#include "../../../Platform/Platform.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
 #include "../../../Memory/Memory.h"
@@ -31,6 +31,8 @@
 #include "VulkanUniformBuffer.h"
 #include "VulkanDebugger.h"
 #include "VulkanDevice.h"
+#include "VulkanRenderPassManager.h"
+#include "VulkanSwapchain.h"
 
 #include "VulkanRenderer.h"
 
@@ -107,22 +109,23 @@ namespace Epoch {
         // Create VulkanDevice
         _device = new VulkanDevice( _instance, requiredValidationLayers, _surface );
 
+        // HACK: This is here until the platform layer is removed.
+        _device->FramebufferSize = _platform->GetFramebufferExtent();
+
         // Shader creation.
         createShader( "main" );
 
-        createSwapchain();
-        createSwapchainImagesAndViews();
+
+        Extent2D extent = _platform->GetFramebufferExtent();
+        _swapchain = new VulkanSwapchain( _device, _surface, _platform->GetWindow(), extent.Width, extent.Height );
 
         createRenderPass();
+        _swapchain->RegenerateFramebuffers();
 
         createDescriptorSetLayout();
 
         createGraphicsPipeline();
 
-        //createCommandPool();
-
-        createDepthResources();
-        createFramebuffers();
 
         // Asset loading here for now
 
@@ -143,7 +146,7 @@ namespace Epoch {
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
-        U64 swapchainImageCount = _swapchainImages.size();
+        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
             updateDescriptorSet( i, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }
@@ -160,12 +163,12 @@ namespace Epoch {
         VK_CHECK( vkDeviceWaitIdle( _device->LogicalDevice ) );
 
         // sync objects
-        for( U8 i = 0; i < _maxFramesInFlight; ++i ) {
+        for( U8 i = 0; i < _swapchain->MaxFramesInFlight; ++i ) {
             vkDestroySemaphore( _device->LogicalDevice, _imageAvailableSemaphores[i], nullptr );
             vkDestroySemaphore( _device->LogicalDevice, _renderCompleteSemaphores[i], nullptr );
             vkDestroyFence( _device->LogicalDevice, _inFlightFences[i], nullptr );
         }
-        U64 swapchainImageCount = _swapchainImages.size();
+        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
 
         vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, _commandBuffers.size(), _commandBuffers.data() );
         //vkFreeDescriptorSets( _device->LogicalDevice, _descriptorPool, swapchainImageCount, _descriptorSets.data() );
@@ -194,27 +197,18 @@ namespace Epoch {
         delete _textures[1];
         _textures[1] = nullptr;
 
-        for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            vkDestroyFramebuffer( _device->LogicalDevice, _swapchainFramebuffers[i], nullptr );
-        }
 
-        if( _depthImage ) {
-            delete _depthImage;
-            _depthImage = nullptr;
-        }
 
         vkDestroyPipeline( _device->LogicalDevice, _pipeline, nullptr );
         vkDestroyPipelineLayout( _device->LogicalDevice, _pipelineLayout, nullptr );
 
         vkDestroyDescriptorSetLayout( _device->LogicalDevice, _descriptorSetLayout, nullptr );
-        vkDestroyRenderPass( _device->LogicalDevice, _renderPass, nullptr );
+        VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Temp" );
 
-        for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            vkDestroyImageView( _device->LogicalDevice, _swapchainImageViews[i], nullptr );
-            //vkDestroyImage( _device->LogicalDevice, _swapchainImages[i], nullptr );
+        if( _swapchain ) {
+            delete _swapchain;
+            _swapchain = nullptr;
         }
-
-        vkDestroySwapchainKHR( _device->LogicalDevice, _swapchain, nullptr );
 
         vkDestroyShaderModule( _device->LogicalDevice, _vertexShaderModule, nullptr );
         vkDestroyShaderModule( _device->LogicalDevice, _fragmentShaderModule, nullptr );
@@ -225,8 +219,6 @@ namespace Epoch {
             delete _debugger;
             _debugger = nullptr;
         }
-
-        //cleanupSwapchain();
 
         if( _device ) {
             delete _device;
@@ -252,15 +244,21 @@ namespace Epoch {
             return true;
         }
 
+        if( _framebufferResizeOccurred ) {
+            _framebufferResizeOccurred = false;
+            recreateSwapchain();
+            return true;
+        }
+
         // The operations here are asynchronous and not guaranteed to happen in order. Manage
         // this with semaphores and fences.
 
         // Wait for the execution of the current frame to complete. The fence being free will allow this to move on.
-        vkWaitForFences( _device->LogicalDevice, 1, &_inFlightFences[_currentFrameIndex], VK_TRUE, U64_MAX );
+        vkWaitForFences( _device->LogicalDevice, 1, &_inFlightFences[_swapchain->GetCurrentFrameIndex()], VK_TRUE, U64_MAX );
 
         // Acquire next image from the swap chain.
         U32 imageIndex;
-        VkResult result = vkAcquireNextImageKHR( _device->LogicalDevice, _swapchain, U64_MAX, _imageAvailableSemaphores[_currentFrameIndex], VK_NULL_HANDLE, &imageIndex );
+        VkResult result = vkAcquireNextImageKHR( _device->LogicalDevice, _swapchain->GetHandle(), U64_MAX, _imageAvailableSemaphores[_swapchain->GetCurrentFrameIndex()], VK_NULL_HANDLE, &imageIndex );
         if( result == VkResult::VK_ERROR_OUT_OF_DATE_KHR ) {
             // Trigger swapchain recreation, then boot out of the render loop.
             recreateSwapchain();
@@ -289,10 +287,12 @@ namespace Epoch {
 
         // Begin the render pass.
         VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-        renderPassBeginInfo.renderPass = _renderPass;
-        renderPassBeginInfo.framebuffer = _swapchainFramebuffers[imageIndex];
+        // TODO: get once and store
+
+        renderPassBeginInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Temp" );// _renderPass;
+        renderPassBeginInfo.framebuffer = _swapchain->GetFramebuffer( imageIndex );// _swapchainFramebuffers[imageIndex];
         renderPassBeginInfo.renderArea.offset = { 0,0 };
-        renderPassBeginInfo.renderArea.extent = _swapchainExtent;
+        renderPassBeginInfo.renderArea.extent = _swapchain->Extent;// _swapchainExtent;
 
         // TODO: Clear colour and depth based on configuration.
         VkClearValue clearValues[2] = {};
@@ -344,12 +344,13 @@ namespace Epoch {
         // ////////////////// END COMMAND BUFFERS ///////////////////////////////
 
         // Check if a previous frame is using this image (i.e. its fence is being waited on)
-        if( _inFlightImageFences[_currentFrameIndex] != VK_NULL_HANDLE ) {
-            vkWaitForFences( _device->LogicalDevice, 1, &_inFlightImageFences[_currentFrameIndex], VK_TRUE, U64_MAX );
+        U8 frameidx = _swapchain->GetCurrentFrameIndex();
+        if( _inFlightImageFences[frameidx] != VK_NULL_HANDLE ) {
+            vkWaitForFences( _device->LogicalDevice, 1, &_inFlightImageFences[frameidx], VK_TRUE, U64_MAX );
         }
 
         // Mark the image fence as in-use by this frame.
-        _inFlightImageFences[_currentFrameIndex] = _inFlightFences[_currentFrameIndex];
+        _inFlightImageFences[frameidx] = _inFlightFences[frameidx];
 
         updateUniformBuffers( imageIndex );
 
@@ -358,7 +359,7 @@ namespace Epoch {
         // Submit the queue and wait for the operation to complete.
         VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
-        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrameIndex] };
+        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[frameidx] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
         submitInfo.waitSemaphoreCount = 1;
@@ -367,37 +368,18 @@ namespace Epoch {
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &_commandBuffers[imageIndex]; // Command buffers to be executed (primary only).
 
-        VkSemaphore signalSemaphores[] = { _renderCompleteSemaphores[_currentFrameIndex] };
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
+        submitInfo.pSignalSemaphores = &_renderCompleteSemaphores[frameidx];
 
         // Reset the fence for use on the next frame.
-        vkResetFences( _device->LogicalDevice, 1, &_inFlightImageFences[_currentFrameIndex] );
+        vkResetFences( _device->LogicalDevice, 1, &_inFlightImageFences[frameidx] );
 
         // Submit the queue
-        VK_CHECK( vkQueueSubmit( _device->GraphicsQueue, 1, &submitInfo, _inFlightFences[_currentFrameIndex] ) );
+        VK_CHECK( vkQueueSubmit( _device->GraphicsQueue, 1, &submitInfo, _inFlightFences[frameidx] ) );
 
-        // Return the image to the swapchain for presentation
-        VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = &_swapchain;
-        presentInfo.pImageIndices = &imageIndex;
-        presentInfo.pResults = nullptr;
 
-        result = vkQueuePresentKHR( _device->PresentationQueue, &presentInfo );
-        if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || _framebufferResizeOccurred ) {
-            // Swapchain is out of date, suboptimal or a framebuffer resize hjas occurred. Trigger swapchain recreation.
-            _framebufferResizeOccurred = false;
-            recreateSwapchain();
-        } else if( result != VkResult::VK_SUCCESS ) {
-            Logger::Error( "Failed to present swap chain image!" );
-            return false;
-        }
+        _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[frameidx], imageIndex );
 
-        // Increment (and loop) the index.
-        _currentFrameIndex = ( _currentFrameIndex + 1 ) % _maxFramesInFlight;
 
         return true;
     }
@@ -407,6 +389,9 @@ namespace Epoch {
         case EventType::WINDOW_RESIZED:
             //const WindowResizedEvent wre = (const WindowResizedEvent)event;
             _framebufferResizeOccurred = true;
+            if( _platform && _device ) {
+                _device->FramebufferSize = _platform->GetFramebufferExtent();
+            }
             break;
         default:
             break;
@@ -420,6 +405,10 @@ namespace Epoch {
         return new VulkanTexture( _device, path, path );
     }
 
+    Extent2D VulkanRenderer::GetFramebufferExtent() {
+        return _platform->GetFramebufferExtent();
+    }
+
     void VulkanRenderer::createShader( const char* name ) {
 
         // Vertex shader
@@ -427,7 +416,7 @@ namespace Epoch {
         char* vertexShaderSource = readShaderFile( name, "vert", &vertShaderSize );
         VkShaderModuleCreateInfo vertexShaderCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
         vertexShaderCreateInfo.codeSize = vertShaderSize;
-        vertexShaderCreateInfo.pCode = (U32*)vertexShaderSource;        
+        vertexShaderCreateInfo.pCode = (U32*)vertexShaderSource;
         VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &vertexShaderCreateInfo, nullptr, &_vertexShaderModule ) );
 
         // Fragment shader
@@ -435,7 +424,7 @@ namespace Epoch {
         char* fragShaderSource = readShaderFile( name, "frag", &fragShaderSize );
         VkShaderModuleCreateInfo fragShaderCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
         fragShaderCreateInfo.codeSize = fragShaderSize;
-        fragShaderCreateInfo.pCode = (U32*)fragShaderSource;        
+        fragShaderCreateInfo.pCode = (U32*)fragShaderSource;
         VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &fragShaderCreateInfo, nullptr, &_fragmentShaderModule ) );
 
         // Vertex shader stage
@@ -480,120 +469,11 @@ namespace Epoch {
         return fileBuffer;
     }
 
-    void VulkanRenderer::createSwapchain() {
-        VulkanSwapchainSupportDetails swapchainSupport = _device->SwapchainSupport;
-        VkSurfaceCapabilitiesKHR capabilities = swapchainSupport.Capabilities;
-
-        // Choose a swap surface format
-        bool found = false;
-        for( auto format : swapchainSupport.Formats ) {
-
-            // Preferred formats 
-            if( format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR ) {
-                _swapchainImageFormat = format;
-                found = true;
-                break;
-            }
-        }
-
-        if( !found ) {
-            _swapchainImageFormat = swapchainSupport.Formats[0];
-        }
-
-        // Choose a present mode
-        VkPresentModeKHR presentMode;
-        found = false;
-        for( auto mode : swapchainSupport.PresentationModes ) {
-
-            // If preferred mode is available, use it
-            if( mode == VK_PRESENT_MODE_MAILBOX_KHR ) {
-                presentMode = mode;
-                found = true;
-            }
-        }
-
-        if( !found ) {
-            presentMode = VK_PRESENT_MODE_FIFO_KHR;
-        }
-
-        // Swapchain extent
-        if( capabilities.currentExtent.width != U32_MAX ) {
-            _swapchainExtent = capabilities.currentExtent;
-        } else {
-            Extent2D extent = _platform->GetFramebufferExtent();
-            _swapchainExtent = { (U32)extent.Width, (U32)extent.Height };
-
-            // Clamp to a value allowed by the GPU.
-            _swapchainExtent.width = TMath::ClampU32( _swapchainExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width );
-            _swapchainExtent.height = TMath::ClampU32( _swapchainExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height );
-        }
-
-        U32 imageCount = capabilities.minImageCount + 1;
-
-        if( capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount ) {
-            imageCount = capabilities.maxImageCount;
-        }
-
-        // Swapchain create info
-        VkSwapchainCreateInfoKHR swapchainCreateInfo = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
-        swapchainCreateInfo.surface = _surface;
-        swapchainCreateInfo.minImageCount = imageCount;
-        swapchainCreateInfo.imageFormat = _swapchainImageFormat.format;
-        swapchainCreateInfo.imageColorSpace = _swapchainImageFormat.colorSpace;
-        swapchainCreateInfo.imageExtent = _swapchainExtent;
-        swapchainCreateInfo.imageArrayLayers = 1;
-        swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-        // Setup the queue family indices
-        if( _device->GraphicsFamilyQueueIndex != _device->PresentationFamilyQueueIndex ) {
-            U32 queueFamilyIndices[] = { (U32)_device->GraphicsFamilyQueueIndex, (U32)_device->PresentationFamilyQueueIndex };
-            swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-            swapchainCreateInfo.queueFamilyIndexCount = 2;
-            swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
-        } else {
-            swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            swapchainCreateInfo.queueFamilyIndexCount = 0;
-            swapchainCreateInfo.pQueueFamilyIndices = nullptr;
-        }
-
-        swapchainCreateInfo.preTransform = capabilities.currentTransform;
-        swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        swapchainCreateInfo.presentMode = presentMode;
-        swapchainCreateInfo.clipped = VK_TRUE;
-        swapchainCreateInfo.oldSwapchain = nullptr;
-
-        VK_CHECK( vkCreateSwapchainKHR( _device->LogicalDevice, &swapchainCreateInfo, nullptr, &_swapchain ) );
-    }
-
-    void VulkanRenderer::createSwapchainImagesAndViews() {
-
-        // Images
-        U32 swapchainImageCount = 0;
-        vkGetSwapchainImagesKHR( _device->LogicalDevice, _swapchain, &swapchainImageCount, nullptr );
-        _swapchainImages.resize( swapchainImageCount );
-        _swapchainImageViews.resize( swapchainImageCount );
-        vkGetSwapchainImagesKHR( _device->LogicalDevice, _swapchain, &swapchainImageCount, _swapchainImages.data() );
-
-        for( U32 i = 0; i < swapchainImageCount; ++i ) {
-            VkImageViewCreateInfo viewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-            viewInfo.image = _swapchainImages[i];
-            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = _swapchainImageFormat.format;
-            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            viewInfo.subresourceRange.baseMipLevel = 0;
-            viewInfo.subresourceRange.levelCount = 1;
-            viewInfo.subresourceRange.baseArrayLayer = 0;
-            viewInfo.subresourceRange.layerCount = 1;
-
-            VK_CHECK( vkCreateImageView( _device->LogicalDevice, &viewInfo, nullptr, &_swapchainImageViews[i] ) );
-        }
-    }
-
     void VulkanRenderer::createRenderPass() {
 
         // Color attachment
         VkAttachmentDescription colorAttachment = {};
-        colorAttachment.format = _swapchainImageFormat.format;
+        colorAttachment.format = _swapchain->ImageFormat.format;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // per-pixel samples.
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear contents.
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Preserve after rendering
@@ -671,24 +551,28 @@ namespace Epoch {
         renderPassCreateInfo.pSubpasses = &subpass;
         renderPassCreateInfo.dependencyCount = 1;
         renderPassCreateInfo.pDependencies = &dependency;
-        VK_CHECK( vkCreateRenderPass( _device->LogicalDevice, &renderPassCreateInfo, nullptr, &_renderPass ) );
+
+        VulkanRenderPassManager::CreateRenderPass( _device, renderPassCreateInfo );
+        //VK_CHECK( vkCreateRenderPass( _device->LogicalDevice, &renderPassCreateInfo, nullptr, &_renderPass ) );
     }
 
     void VulkanRenderer::createGraphicsPipeline() {
 
+        VkExtent2D extent = _swapchain->Extent;
+
         // Viewport
         VkViewport viewport = {};
         viewport.x = 0.0f;
-        viewport.y = (F32)_swapchainExtent.height;
-        viewport.width = (F32)_swapchainExtent.width;
-        viewport.height = -(F32)_swapchainExtent.height;
+        viewport.y = (F32)extent.height;
+        viewport.width = (F32)extent.width;
+        viewport.height = -(F32)extent.height;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
 
         // Scissor
         VkRect2D scissor = {};
         scissor.offset = { 0, 0 };
-        scissor.extent = { _swapchainExtent.width, _swapchainExtent.height };
+        scissor.extent = { extent.width, extent.height };
 
         // Viewport state
         VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
@@ -818,7 +702,9 @@ namespace Epoch {
         pipelineCreateInfo.pDynamicState = nullptr;
 
         pipelineCreateInfo.layout = _pipelineLayout;
-        pipelineCreateInfo.renderPass = _renderPass;
+
+        // TODO: Get once and save
+        pipelineCreateInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Temp" );
         pipelineCreateInfo.subpass = 0;
         pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
         pipelineCreateInfo.basePipelineIndex = -1;
@@ -830,26 +716,10 @@ namespace Epoch {
 
 
 
-    void VulkanRenderer::createDepthResources() {
-        _depthFormat = VulkanUtilities::FindDepthFormat( _device->PhysicalDevice );
-        VulkanImageCreateInfo depthImageCreateInfo;
-        depthImageCreateInfo.Width = _swapchainExtent.width;
-        depthImageCreateInfo.Height = _swapchainExtent.height;
-        depthImageCreateInfo.Type = VK_IMAGE_TYPE_2D;
-        depthImageCreateInfo.Format = _depthFormat;
-        depthImageCreateInfo.Tiling = VK_IMAGE_TILING_OPTIMAL;
-        depthImageCreateInfo.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        depthImageCreateInfo.Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        depthImageCreateInfo.CreateView = true;
-        depthImageCreateInfo.ViewAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-        VulkanImage::Create( _device, depthImageCreateInfo, &_depthImage );
-    }
-
     void VulkanRenderer::createUniformBuffers() {
         VkDeviceSize bufferSize = sizeof( StandardUniformBufferObject );
 
-        U64 swapchainImageCount = _swapchainImages.size();
+        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         _uniformBuffers.resize( swapchainImageCount );
 
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
@@ -865,6 +735,7 @@ namespace Epoch {
         auto currentTime = std::chrono::high_resolution_clock::now();
         F32 time = std::chrono::duration<F32, std::chrono::seconds::period>( currentTime - startTime ).count();
 
+        VkExtent2D extent = _swapchain->Extent;
         StandardUniformBufferObject ubo = {};
         Rotator rotator;
         rotator.Pitch = time * 90.0f * 0.1f;
@@ -873,7 +744,7 @@ namespace Epoch {
         ubo.Model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
         ubo.Model *= rotator.ToQuaternion().ToMatrix4x4();
         ubo.View = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
-        ubo.Projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)_swapchainExtent.width / (F32)_swapchainExtent.height, 0.1f, 1000.0f );
+        ubo.Projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)extent.width / (F32)extent.height, 0.1f, 1000.0f );
 
         // For now, since this happens every frame, just push to the buffer directly.
         void* data = _uniformBuffers[currentImageIndex]->GetInternal()->LockMemory( 0, sizeof( ubo ), 0 );
@@ -910,22 +781,23 @@ namespace Epoch {
     }
 
     void VulkanRenderer::createDescriptorPool() {
+        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         VkDescriptorPoolSize poolSizes[2];
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = (U32)_swapchainImages.size();
+        poolSizes[0].descriptorCount = swapchainImageCount;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = (U32)_swapchainImages.size();;
+        poolSizes[1].descriptorCount = swapchainImageCount;
 
         VkDescriptorPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = 2;
         poolInfo.pPoolSizes = poolSizes;
-        poolInfo.maxSets = (U32)_swapchainImages.size();
+        poolInfo.maxSets = swapchainImageCount;
 
         VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &poolInfo, nullptr, &_descriptorPool ) );
     }
     void VulkanRenderer::createDescriptorSets() {
-        U64 swapchainImageCount = _swapchainImages.size();
+        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         // Fill an array with pointers to the descriptor set layout.
         std::vector<VkDescriptorSetLayout> layouts( swapchainImageCount, _descriptorSetLayout );
 
@@ -935,7 +807,7 @@ namespace Epoch {
         allocInfo.descriptorSetCount = (U32)swapchainImageCount;
         allocInfo.pSetLayouts = layouts.data();
 
-        _descriptorSets.resize( _swapchainImages.size() );
+        _descriptorSets.resize( swapchainImageCount );
         VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, _descriptorSets.data() ) );
     }
 
@@ -974,46 +846,27 @@ namespace Epoch {
         vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
     }
 
-    void VulkanRenderer::createFramebuffers() {
-        U32 swapchainImageCount = (U32)_swapchainImageViews.size();
-        _swapchainFramebuffers.resize( swapchainImageCount );
 
-        for( U32 i = 0; i < swapchainImageCount; ++i ) {
-            U32 attachmentCount = 2; // TODO: Make this dynamic based on currently configured attachments.
-            VkImageView attachments[] = {
-                _swapchainImageViews[i],
-                _depthImage->GetView()
-            };
-
-            VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-            framebufferCreateInfo.renderPass = _renderPass;
-            framebufferCreateInfo.attachmentCount = attachmentCount;
-            framebufferCreateInfo.pAttachments = attachments;
-            framebufferCreateInfo.width = _swapchainExtent.width;
-            framebufferCreateInfo.height = _swapchainExtent.height;
-            framebufferCreateInfo.layers = 1;
-
-            VK_CHECK( vkCreateFramebuffer( _device->LogicalDevice, &framebufferCreateInfo, nullptr, &_swapchainFramebuffers[i] ) );
-        }
-    }
 
     void VulkanRenderer::createCommandBuffers() {
+        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
         commandBufferAllocateInfo.commandPool = _device->CommandPool;
         commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        commandBufferAllocateInfo.commandBufferCount = (U32)_swapchainImageViews.size();
+        commandBufferAllocateInfo.commandBufferCount = swapchainImageCount;
 
-        _commandBuffers.resize( _swapchainImageViews.size() );
+        _commandBuffers.resize( swapchainImageCount );
 
         VK_CHECK( vkAllocateCommandBuffers( _device->LogicalDevice, &commandBufferAllocateInfo, _commandBuffers.data() ) );
     }
 
     void VulkanRenderer::createSyncObjects() {
-        _imageAvailableSemaphores.resize( _maxFramesInFlight );
-        _renderCompleteSemaphores.resize( _maxFramesInFlight );
-        _inFlightFences.resize( _maxFramesInFlight );
+        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
+        _imageAvailableSemaphores.resize( _swapchain->MaxFramesInFlight ); // _maxFramesInFlight
+        _renderCompleteSemaphores.resize( _swapchain->MaxFramesInFlight );
+        _inFlightFences.resize( _swapchain->MaxFramesInFlight );
 
-        for( U8 i = 0; i < _maxFramesInFlight; ++i ) {
+        for( U8 i = 0; i < _swapchain->MaxFramesInFlight; ++i ) {
             VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
             VK_CHECK( vkCreateSemaphore( _device->LogicalDevice, &semaphoreCreateInfo, nullptr, &_imageAvailableSemaphores[i] ) );
             VK_CHECK( vkCreateSemaphore( _device->LogicalDevice, &semaphoreCreateInfo, nullptr, &_renderCompleteSemaphores[i] ) );
@@ -1028,20 +881,14 @@ namespace Epoch {
         }
 
         // In flight fences should not yet exist at this point, so clear the list.
-        _inFlightImageFences.resize( _swapchainImages.size() );
-        for( U64 i = 0; i < _swapchainImages.size(); ++i ) {
+        _inFlightImageFences.resize( swapchainImageCount );
+        for( U64 i = 0; i < swapchainImageCount; ++i ) {
             _inFlightImageFences[i] = nullptr;
         }
     }
 
     void VulkanRenderer::cleanupSwapchain() {
-        if( _depthImage ) {
-            delete _depthImage;
-        }
 
-        for( U64 i = 0; i < _swapchainImages.size(); ++i ) {
-            vkDestroyFramebuffer( _device->LogicalDevice, _swapchainFramebuffers[i], nullptr );
-        }
 
         // Free the command buffers in the pool, but do not destroy the pool.
         vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, (U32)_commandBuffers.size(), _commandBuffers.data() );
@@ -1050,14 +897,7 @@ namespace Epoch {
         vkDestroyPipeline( _device->LogicalDevice, _pipeline, nullptr );
         vkDestroyPipelineLayout( _device->LogicalDevice, _pipelineLayout, nullptr );
 
-        vkDestroyRenderPass( _device->LogicalDevice, _renderPass, nullptr );
-
-        for( auto scImageView : _swapchainImageViews ) {
-            vkDestroyImageView( _device->LogicalDevice, scImageView, nullptr );
-        }
-        _swapchainImages.clear();
-
-        vkDestroySwapchainKHR( _device->LogicalDevice, _swapchain, nullptr );
+        VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Temp" );
 
         // Destroy UBOs
 
@@ -1077,23 +917,24 @@ namespace Epoch {
             _platform->WaitEvents();
         }
 
-        VK_CHECK( vkDeviceWaitIdle( _device->LogicalDevice ) );
+        // Cleanup and recreate swapchain.
+        _device->RequerySupport();
+        _swapchain->Recreate( extent.Width, extent.Height );
 
         // Cleanup the old swapchain.
         cleanupSwapchain();
 
-        _device->RequerySupport();
 
-        createSwapchain();
-        createSwapchainImagesAndViews();
+
         createRenderPass();
         createGraphicsPipeline();
-        createDepthResources();
-        createFramebuffers();
+        _swapchain->RegenerateFramebuffers();
+        //createDepthResources();
+        //createFramebuffers();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
-        U64 swapchainImageCount = _swapchainImages.size();
+        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
             updateDescriptorSet( i, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }

@@ -326,6 +326,9 @@ namespace Epoch {
             return VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
         case VulkanBufferType::UNIFORM:
             return VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        default:
+            Logger::Fatal( "Invalid usage. This should never happen." );
+            return VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
         }
     }
 

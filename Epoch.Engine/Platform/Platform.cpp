@@ -2,14 +2,20 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 
-#include "Logger.h"
-#include "Engine.h"
+#include "../Logger.h"
+#include "../Engine.h"
 
 // TODO: move this to renderer layer
-#include "Renderer/Backend/Vulkan/VulkanUtilities.h"
+#include "../Renderer/Backend/Vulkan/VulkanUtilities.h"
+
+#include "TGLFWWindow.h"
 #include "Platform.h"
 
 namespace Epoch {
+
+    IWindow* Platform::CreateWindow( const char* applicationName, U32 width, U32 height ) {
+        return new TGLFWWindow( applicationName, width, height );
+    }
 
     Platform::Platform( Engine* engine, const char* applicationName ) {
         Logger::Trace( "Initializing platform layer..." );
@@ -17,8 +23,10 @@ namespace Epoch {
 
         glfwInit();
 
+        // If vulkan
         glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
 
+        // TODO: stop-gap for now
         _window = glfwCreateWindow( 1280, 720, applicationName, nullptr, nullptr );
         glfwSetWindowUserPointer( _window, this );
         glfwSetFramebufferSizeCallback( _window, Platform::onFrameBufferResize );

@@ -21,6 +21,7 @@ namespace Epoch {
     class VulkanUniformBuffer;
     class VulkanDebugger;
     class VulkanDevice;
+    class VulkanSwapchain;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
@@ -37,16 +38,14 @@ namespace Epoch {
 
         ITexture* GetTexture( const char* path );
 
+        Extent2D GetFramebufferExtent();
+
     private:
         void createShader( const char* name );
         char* readShaderFile( const char* filename, const char* shaderType, U64* fileSize );
-        void createSwapchain();
-        void createSwapchainImagesAndViews();
         void createRenderPass();
         void createGraphicsPipeline();
         
-        void createDepthResources();
-        void createFramebuffers();
         void createUniformBuffers();
         void updateUniformBuffers( U32 currentImageIndex );
         void createDescriptorSetLayout();
@@ -76,41 +75,31 @@ namespace Epoch {
         VkShaderModule _vertexShaderModule;
         VkShaderModule _fragmentShaderModule;
 
-        VkSurfaceFormatKHR _swapchainImageFormat;
-        VkExtent2D _swapchainExtent;
-        VkSwapchainKHR _swapchain;
+        // Descriptor pools/sets
+        VkDescriptorPool _descriptorPool;
+        VkDescriptorSetLayout _descriptorSetLayout;
+        std::vector<VkDescriptorSet> _descriptorSets;
 
-        std::vector<VkImage> _swapchainImages;
-        std::vector<VkImageView> _swapchainImageViews;
-
-        VkRenderPass _renderPass;
-        VkPipelineLayout _pipelineLayout;
-        VkPipeline _pipeline;
-
-        // Depth image.
-        VkFormat _depthFormat;
-        VulkanImage* _depthImage;
-
-        // Framebuffers - one each for front/back buffer
-        bool _framebufferResizeOccurred = false;
+        VulkanSwapchain* _swapchain;
         bool _recreatingSwapchain = false;
-        std::vector<VkFramebuffer> _swapchainFramebuffers;
+        bool _framebufferResizeOccurred = false;
+
+        //VkRenderPass _renderPass;
+
 
         // Command buffers
         std::vector<VkCommandBuffer> _commandBuffers;
 
+        VkPipelineLayout _pipelineLayout;
+        VkPipeline _pipeline;
+
         // Sync objects
-        U8 _currentFrameIndex;
-        const U8 _maxFramesInFlight = 2;
         std::vector<VkSemaphore> _imageAvailableSemaphores;
         std::vector<VkSemaphore> _renderCompleteSemaphores;
         std::vector<VkFence> _inFlightFences;
         std::vector<VkFence> _inFlightImageFences;
 
-        // Descriptor pools/sets
-        VkDescriptorPool _descriptorPool;
-        VkDescriptorSetLayout _descriptorSetLayout;
-        std::vector<VkDescriptorSet> _descriptorSets;
+        
 
         // 1 per swap chain image.
         std::vector<VulkanUniformBuffer*> _uniformBuffers;
