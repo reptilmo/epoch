@@ -5,8 +5,10 @@
 #include "VulkanRenderer.h"
 #include "VulkanDevice.h"
 #include "VulkanUtilities.h"
+#include "VulkanTexture.h"
 #include "VulkanImage.h"
 #include "VulkanRenderPassManager.h"
+#include "VulkanRenderPass.h"
 #include "VulkanSwapchain.h"
 
 namespace Epoch {
@@ -70,12 +72,12 @@ namespace Epoch {
             U32 attachmentCount = 2; // TODO: Make this dynamic based on currently configured attachments.
             VkImageView attachments[] = {
                 _swapchainImageViews[i],
-                _depthImage->GetView()
+                ( (VulkanImage*)_depthAttachment->GetImage() )->GetView()
             };
 
             VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
             // TODO: use passed-in name
-            framebufferCreateInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Temp" );
+            framebufferCreateInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" )->GetHandle();
             framebufferCreateInfo.attachmentCount = attachmentCount;
             framebufferCreateInfo.pAttachments = attachments;
             framebufferCreateInfo.width = Extent.width;
@@ -92,9 +94,9 @@ namespace Epoch {
             vkDestroyFramebuffer( _device->LogicalDevice, _swapchainFramebuffers[i], nullptr );
         }
 
-        if( _depthImage ) {
-            delete _depthImage;
-            _depthImage = nullptr;
+        if( _depthAttachment ) {
+            delete _depthAttachment;
+            _depthAttachment = nullptr;
         }
 
         for( auto scImageView : _swapchainImageViews ) {
@@ -223,9 +225,9 @@ namespace Epoch {
         depthImageCreateInfo.CreateView = true;
         depthImageCreateInfo.ViewAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        VulkanImage::Create( _device, depthImageCreateInfo, &_depthImage );
-
-
-
+        // TODO: Streamline this process.
+        VulkanImage* depth;
+        VulkanImage::Create( _device, depthImageCreateInfo, &depth );
+        _depthAttachment = new VulkanTexture( depth, "depth", true );
     }
 }

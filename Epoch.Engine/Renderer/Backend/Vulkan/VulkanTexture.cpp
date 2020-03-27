@@ -16,7 +16,7 @@ namespace Epoch {
     VulkanTexture::VulkanTexture( VulkanDevice* device, const char* name, const char* path ) {
         _device = device;
         _name = name;
-
+        _destroy = true;
 
         I32 width, height, channelCount;
         byte* pixels = ImageUtilities::LoadImage( path, &width, &height, &channelCount );
@@ -58,11 +58,19 @@ namespace Epoch {
         _textureImage->TransitionLayout( textureImageCreateInfo.Format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
     }
 
+    VulkanTexture::VulkanTexture( VulkanImage* image, const char* name, const bool destroy ) {
+        _device = image->GetDevice();
+        _name = name;
+        _destroy = destroy;
+        _textureImage = image;
+    }
+
     VulkanTexture::~VulkanTexture() {
-        if( _textureImage ) {
-            delete _textureImage;
-            _textureImage = nullptr;
+        if( _textureImage && _destroy ) {
+            delete _textureImage;            
         }
+
+        _textureImage = nullptr;
 
         _device = nullptr;
     }

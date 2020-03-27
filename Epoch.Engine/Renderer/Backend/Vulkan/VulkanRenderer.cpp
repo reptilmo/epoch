@@ -32,6 +32,7 @@
 #include "VulkanDebugger.h"
 #include "VulkanDevice.h"
 #include "VulkanRenderPassManager.h"
+#include "VulkanRenderPass.h"
 #include "VulkanSwapchain.h"
 
 #include "VulkanRenderer.h"
@@ -148,7 +149,7 @@ namespace Epoch {
         createDescriptorSets();
         U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            updateDescriptorSet( i, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
+            updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }
 
         createCommandBuffers();
@@ -203,7 +204,7 @@ namespace Epoch {
         vkDestroyPipelineLayout( _device->LogicalDevice, _pipelineLayout, nullptr );
 
         vkDestroyDescriptorSetLayout( _device->LogicalDevice, _descriptorSetLayout, nullptr );
-        VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Temp" );
+        VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
         if( _swapchain ) {
             delete _swapchain;
@@ -275,7 +276,7 @@ namespace Epoch {
             _currentTextureIndex = ( _currentTextureIndex == 0 ? 1 : 0 );
             _updatesTemp = 0;
         }
-        updateDescriptorSet( imageIndex, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
+        updateDescriptorSet( imageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
 
         // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
         // Prepare commands for the queue.
@@ -285,31 +286,19 @@ namespace Epoch {
         beginInfo.pInheritanceInfo = nullptr;
         VK_CHECK( vkBeginCommandBuffer( _commandBuffers[imageIndex], &beginInfo ) );
 
-        // Begin the render pass.
-        VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-        // TODO: get once and store
-
-        renderPassBeginInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Temp" );// _renderPass;
-        renderPassBeginInfo.framebuffer = _swapchain->GetFramebuffer( imageIndex );// _swapchainFramebuffers[imageIndex];
-        renderPassBeginInfo.renderArea.offset = { 0,0 };
-        renderPassBeginInfo.renderArea.extent = _swapchain->Extent;// _swapchainExtent;
-
-        // TODO: Clear colour and depth based on configuration.
-        VkClearValue clearValues[2] = {};
-        clearValues[0].color = { 0.0f, 0.0f, 0.2f, 0.0f };
-        clearValues[1].depthStencil = { 1.0f, 0 };
-        renderPassBeginInfo.clearValueCount = 2;
-        renderPassBeginInfo.pClearValues = clearValues;
-
-        // TODO: make configurable
-        vkCmdBeginRenderPass( _commandBuffers[imageIndex], &renderPassBeginInfo, VkSubpassContents::VK_SUBPASS_CONTENTS_INLINE );
+        // Begin the render pass. TODO: Should probably create these once and reuse.
+        VulkanRenderPass* renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
+        RenderPassClearInfo clearInfo;
+        clearInfo.Color.Set( 0.0f, 0.0f, 0.2f, 0.0f );
+        clearInfo.RenderArea.Set( 0, 0, _swapchain->Extent.width, _swapchain->Extent.height );
+        clearInfo.Depth = 1.0f;
+        clearInfo.Stencil = 0;
+        renderPass->Begin( clearInfo, _swapchain->GetFramebuffer( imageIndex ), _commandBuffers[imageIndex] );
 
         // Bind the buffer to the graphics pipeline
         vkCmdBindPipeline( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline );
 
         // TODO: These should be provided by the front end instead.
-        //auto vertexBufferRanges = _vertexBuffer->GetDataRanges();
-        //auto indexBufferRanges = _indexBuffer->GetDataRanges();
         const LinkedListNode<VulkanBufferDataBlock>* vBlock = _vertexBuffer->PeekDataBlock();
         const LinkedListNode<VulkanBufferDataBlock>* iBlock = _indexBuffer->PeekDataBlock();
 
@@ -336,7 +325,7 @@ namespace Epoch {
         }
 
         // End render pass.
-        vkCmdEndRenderPass( _commandBuffers[imageIndex] );
+        renderPass->End( _commandBuffers[imageIndex] );
 
         // End recording
         VK_CHECK( vkEndCommandBuffer( _commandBuffers[imageIndex] ) );
@@ -471,88 +460,31 @@ namespace Epoch {
 
     void VulkanRenderer::createRenderPass() {
 
-        // Color attachment
-        VkAttachmentDescription colorAttachment = {};
-        colorAttachment.format = _swapchain->ImageFormat.format;
-        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // per-pixel samples.
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear contents.
-        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Preserve after rendering
-        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Do not expect any particular layout before render pass starts.
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Transitioned to after the render pass
+        RenderPassData renderPassData;
+        renderPassData.Name = "RenderPass.Default";
 
-        // Color attachment reference
-        VkAttachmentReference colorAttachmentReference = {};
-        colorAttachmentReference.attachment = 0;
-        colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        RenderTargetOptions colorRenderTargetOptions;
+        colorRenderTargetOptions.Format = _swapchain->ImageFormat.format;
+        colorRenderTargetOptions.SampleCount = 1;
+        colorRenderTargetOptions.LoadOperation = RenderTargetLoadOperation::CLEAR;
+        colorRenderTargetOptions.StoreOperation = RenderTargetStoreOperation::STORE;
+        colorRenderTargetOptions.StencilLoadOperation = RenderTargetLoadOperation::DONT_CARE;
+        colorRenderTargetOptions.StencilStoreOperation = RenderTargetStoreOperation::DONT_CARE;
+        colorRenderTargetOptions.InputLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Do not expect any particular layout before render pass starts.
+        colorRenderTargetOptions.OutputLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Transitioned to after the render pass        
+        renderPassData.ColorRenderTargetOptions.push_back( colorRenderTargetOptions );
 
+        renderPassData.HasDepthRenderTarget = true;
+        renderPassData.DepthRenderTargetOptions.Format = _device->DepthFormat;
+        renderPassData.DepthRenderTargetOptions.SampleCount = 1;
+        renderPassData.DepthRenderTargetOptions.LoadOperation = RenderTargetLoadOperation::CLEAR;
+        renderPassData.DepthRenderTargetOptions.StoreOperation = RenderTargetStoreOperation::DONT_CARE;
+        renderPassData.DepthRenderTargetOptions.StencilLoadOperation = RenderTargetLoadOperation::DONT_CARE;
+        renderPassData.DepthRenderTargetOptions.StencilStoreOperation = RenderTargetStoreOperation::DONT_CARE;
+        renderPassData.DepthRenderTargetOptions.InputLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        renderPassData.DepthRenderTargetOptions.OutputLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        // Depth attachment
-        VkAttachmentDescription depthAttachment = {};
-        depthAttachment.format = _device->DepthFormat;
-        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        // Depth attachment reference
-        VkAttachmentReference depthAttachmentReference = {};
-        depthAttachmentReference.attachment = 1;
-        depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        // Subpass
-        VkSubpassDescription subpass = {};
-
-        // Graphics or compute - in this case, graphics.
-        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-
-        // Input from a shader
-        subpass.inputAttachmentCount = 0;
-        subpass.pInputAttachments = nullptr;
-
-        // Color buffer.
-        subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &colorAttachmentReference;
-
-        // Depth stencil data.
-        subpass.pDepthStencilAttachment = &depthAttachmentReference;
-
-        // Attachments used for multisampling colour attachments.
-        subpass.pResolveAttachments = nullptr;
-
-        // Attachments not used in this subpass, but must be preserved.
-        subpass.preserveAttachmentCount = 0;
-        subpass.pPreserveAttachments = nullptr;
-
-        // Render pass dependencies
-        VkSubpassDependency dependency = {};
-        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.dstSubpass = 0;
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.srcAccessMask = 0;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-        const U32 attachmentCount = 2;
-        VkAttachmentDescription attachments[attachmentCount] = {
-            colorAttachment,
-            depthAttachment
-        };
-
-        // Render pass create.
-        VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-        renderPassCreateInfo.attachmentCount = attachmentCount;
-        renderPassCreateInfo.pAttachments = attachments;
-        renderPassCreateInfo.subpassCount = 1;
-        renderPassCreateInfo.pSubpasses = &subpass;
-        renderPassCreateInfo.dependencyCount = 1;
-        renderPassCreateInfo.pDependencies = &dependency;
-
-        VulkanRenderPassManager::CreateRenderPass( _device, renderPassCreateInfo );
+        VulkanRenderPassManager::CreateRenderPass( _device, renderPassData );
         //VK_CHECK( vkCreateRenderPass( _device->LogicalDevice, &renderPassCreateInfo, nullptr, &_renderPass ) );
     }
 
@@ -704,7 +636,7 @@ namespace Epoch {
         pipelineCreateInfo.layout = _pipelineLayout;
 
         // TODO: Get once and save
-        pipelineCreateInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Temp" );
+        pipelineCreateInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" )->GetHandle();
         pipelineCreateInfo.subpass = 0;
         pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
         pipelineCreateInfo.basePipelineIndex = -1;
@@ -897,7 +829,7 @@ namespace Epoch {
         vkDestroyPipeline( _device->LogicalDevice, _pipeline, nullptr );
         vkDestroyPipelineLayout( _device->LogicalDevice, _pipelineLayout, nullptr );
 
-        VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Temp" );
+        VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
         // Destroy UBOs
 
@@ -936,7 +868,7 @@ namespace Epoch {
         createDescriptorSets();
         U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            updateDescriptorSet( i, _textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
+            updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }
         createCommandBuffers();
 

@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include "../../../Types.h"
+#include "../../../Resources/IImage.h"
 
 namespace Epoch {
 
@@ -22,7 +23,7 @@ namespace Epoch {
 
     class VulkanDevice;
 
-    class VulkanImage {
+    class VulkanImage : public IImage {
     public:
         void static Create( VulkanDevice* device, VulkanImageCreateInfo& createInfo, VulkanImage** image );
         void static CreateView( VulkanDevice* device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView* view );
@@ -35,6 +36,9 @@ namespace Epoch {
 
         VkImage GetHandle() { return _imageHandle; }
         VkDeviceMemory GetMemory() { return _imageMemory; }
+        VulkanDevice* GetDevice() const { return _device; }
+        const U32 GetWidth() const { return _width; }
+        const U32 GetHeight() const { return _height; }
 
         const bool HasView() { return _view != nullptr; }
         VkImageView GetView() { return _view; }

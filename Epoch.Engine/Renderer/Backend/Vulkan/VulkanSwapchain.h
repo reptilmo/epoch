@@ -8,7 +8,7 @@
 namespace Epoch {
 
     class VulkanDevice;
-    class VulkanImage;
+    class VulkanTexture;
 
     class VulkanSwapchain {
     public:
@@ -50,7 +50,7 @@ namespace Epoch {
 
         // Depth image.
         VkFormat _depthFormat;
-        VulkanImage* _depthImage;
+        VulkanTexture* _depthAttachment;
 
         // Framebuffers - one each for front/back buffer        
         std::vector<VkFramebuffer> _swapchainFramebuffers;
