@@ -120,6 +120,15 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanFence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanSemaphore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanCommandPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Types.h">
@@ -288,6 +297,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Resources\IRenderTarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanFence.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanSemaphore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanCommandBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanCommandPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

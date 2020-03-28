@@ -32,6 +32,8 @@
 #include "VulkanDebugger.h"
 #include "VulkanDevice.h"
 #include "VulkanRenderPassManager.h"
+#include "VulkanFence.h"
+#include "VulkanSemaphore.h"
 #include "VulkanRenderPass.h"
 #include "VulkanSwapchain.h"
 
@@ -41,65 +43,21 @@ namespace Epoch {
 
     VulkanRenderer::VulkanRenderer( Platform* platform ) {
         _platform = platform;
+        Logger::Trace( "Creating Vulkan renderer..." );        
+    }
+
+    VulkanRenderer::~VulkanRenderer() {
+        if( _instance ) {
+
+            // Make sure things are destroyed.
+            Destroy();
+        }
+    }
+
+    const bool VulkanRenderer::Initialize() {
         Logger::Trace( "Initializing Vulkan renderer..." );
 
-        VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-        appInfo.apiVersion = VK_API_VERSION_1_2;
-        appInfo.pApplicationName = "Epoch";
-        appInfo.applicationVersion = VK_MAKE_VERSION( 1, 0, 0 );
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION( 1, 0, 0 );
-
-        VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-        instanceCreateInfo.pApplicationInfo = &appInfo;
-
-        // Extensions
-        const char** pfe = nullptr;
-        U32 count = 0;
-        _platform->GetRequiredExtensions( &count, &pfe );
-        std::vector<const char*> platformExtensions;
-        for( U32 i = 0; i < count; ++i ) {
-            platformExtensions.push_back( pfe[i] );
-        }
-        platformExtensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
-
-        instanceCreateInfo.enabledExtensionCount = (U32)platformExtensions.size();
-        instanceCreateInfo.ppEnabledExtensionNames = platformExtensions.data();
-
-        // Validation layers
-        std::vector<const char*> requiredValidationLayers = {
-            "VK_LAYER_KHRONOS_validation"
-        };
-
-        // Get available layers.
-        U32 availableLayerCount = 0;
-        VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, nullptr ) );
-        std::vector<VkLayerProperties> availableLayers( availableLayerCount );
-        VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, availableLayers.data() ) );
-
-        // Verify that all required layers are available.
-        bool success = true;
-        for( U32 i = 0; i < (U32)requiredValidationLayers.size(); ++i ) {
-            bool found = false;
-            for( U32 j = 0; j < availableLayerCount; ++j ) {
-                if( strcmp( requiredValidationLayers[i], availableLayers[j].layerName ) == 0 ) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if( !found ) {
-                success = false;
-                Logger::Fatal( "Required validation layer is missing: %s", requiredValidationLayers[i] );
-                break;
-            }
-        }
-
-        instanceCreateInfo.enabledLayerCount = (U32)requiredValidationLayers.size();
-        instanceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
-
-        // Create instance
-        VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );
+        createInstance();
 
         // Create debugger
         _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
@@ -108,7 +66,7 @@ namespace Epoch {
         _platform->CreateSurface( _instance, &_surface );
 
         // Create VulkanDevice
-        _device = new VulkanDevice( _instance, requiredValidationLayers, _surface );
+        _device = new VulkanDevice( _instance, _requiredValidationLayers, _surface );
 
         // HACK: This is here until the platform layer is removed.
         _device->FramebufferSize = _platform->GetFramebufferExtent();
@@ -157,18 +115,27 @@ namespace Epoch {
 
         // Listen for resize events.
         Event::Listen( EventType::WINDOW_RESIZED, this );
+
+        return true;
     }
 
-    VulkanRenderer::~VulkanRenderer() {
-
+    void VulkanRenderer::Destroy() {
         VK_CHECK( vkDeviceWaitIdle( _device->LogicalDevice ) );
 
         // sync objects
         for( U8 i = 0; i < _swapchain->MaxFramesInFlight; ++i ) {
-            vkDestroySemaphore( _device->LogicalDevice, _imageAvailableSemaphores[i], nullptr );
-            vkDestroySemaphore( _device->LogicalDevice, _renderCompleteSemaphores[i], nullptr );
-            vkDestroyFence( _device->LogicalDevice, _inFlightFences[i], nullptr );
+            delete _imageAvailableSemaphores[i];
+            delete _renderCompleteSemaphores[i];
+
+            delete _inFlightFences[i];
+            _inFlightFences[i] = nullptr;
+            _inFlightImageFences[i] = nullptr;
         }
+        _inFlightFences.clear();
+        _inFlightImageFences.clear();
+        _imageAvailableSemaphores.clear();
+        _renderCompleteSemaphores.clear();
+
         U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
 
         vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, _commandBuffers.size(), _commandBuffers.data() );
@@ -232,12 +199,6 @@ namespace Epoch {
         }
     }
 
-    const bool VulkanRenderer::Initialize() {
-
-
-        return true;
-    }
-
     const bool VulkanRenderer::Frame( const F32 deltaTime ) {
 
         // If currently recreating the swapchain, boot out.
@@ -255,18 +216,14 @@ namespace Epoch {
         // this with semaphores and fences.
 
         // Wait for the execution of the current frame to complete. The fence being free will allow this to move on.
-        vkWaitForFences( _device->LogicalDevice, 1, &_inFlightFences[_swapchain->GetCurrentFrameIndex()], VK_TRUE, U64_MAX );
+        if( !_inFlightFences[_swapchain->GetCurrentFrameIndex()]->Wait( U64_MAX ) ) {
+            Logger::Warn( "In-flight fence wait failure!" );
+        }
 
         // Acquire next image from the swap chain.
         U32 imageIndex;
-        VkResult result = vkAcquireNextImageKHR( _device->LogicalDevice, _swapchain->GetHandle(), U64_MAX, _imageAvailableSemaphores[_swapchain->GetCurrentFrameIndex()], VK_NULL_HANDLE, &imageIndex );
-        if( result == VkResult::VK_ERROR_OUT_OF_DATE_KHR ) {
-            // Trigger swapchain recreation, then boot out of the render loop.
-            recreateSwapchain();
+        if( !_swapchain->AcquireNextImageIndex( U64_MAX, _imageAvailableSemaphores[_swapchain->GetCurrentFrameIndex()], nullptr, &imageIndex ) ) {
             return true;
-        } else if( result != VkResult::VK_SUCCESS && result != VkResult::VK_SUBOPTIMAL_KHR ) {
-            Logger::Error( "Failed to acquire swapchain image!" );
-            return false;
         }
 
         // Update descriptors if need be. TEST: Swap texture
@@ -335,7 +292,7 @@ namespace Epoch {
         // Check if a previous frame is using this image (i.e. its fence is being waited on)
         U8 frameidx = _swapchain->GetCurrentFrameIndex();
         if( _inFlightImageFences[frameidx] != VK_NULL_HANDLE ) {
-            vkWaitForFences( _device->LogicalDevice, 1, &_inFlightImageFences[frameidx], VK_TRUE, U64_MAX );
+            _inFlightImageFences[frameidx]->Wait( U64_MAX );
         }
 
         // Mark the image fence as in-use by this frame.
@@ -348,7 +305,8 @@ namespace Epoch {
         // Submit the queue and wait for the operation to complete.
         VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
-        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[frameidx] };
+        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[frameidx]->GetHandle() };
+        VkSemaphore signalSemaphores[] = { _renderCompleteSemaphores[frameidx]->GetHandle() };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
         submitInfo.waitSemaphoreCount = 1;
@@ -358,17 +316,16 @@ namespace Epoch {
         submitInfo.pCommandBuffers = &_commandBuffers[imageIndex]; // Command buffers to be executed (primary only).
 
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &_renderCompleteSemaphores[frameidx];
+        submitInfo.pSignalSemaphores = signalSemaphores;
 
         // Reset the fence for use on the next frame.
-        vkResetFences( _device->LogicalDevice, 1, &_inFlightImageFences[frameidx] );
+        _inFlightImageFences[frameidx]->Reset();
 
         // Submit the queue
-        VK_CHECK( vkQueueSubmit( _device->GraphicsQueue, 1, &submitInfo, _inFlightFences[frameidx] ) );
+        VK_CHECK( vkQueueSubmit( _device->GraphicsQueue, 1, &submitInfo, _inFlightFences[frameidx]->GetHandle() ) );
 
-
+        // Give the image back to the swapchain.
         _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[frameidx], imageIndex );
-
 
         return true;
     }
@@ -387,8 +344,6 @@ namespace Epoch {
         }
     }
 
-
-
     ITexture* VulkanRenderer::GetTexture( const char* path ) {
         // TODO: Should probably get by name somehow.
         return new VulkanTexture( _device, path, path );
@@ -396,6 +351,64 @@ namespace Epoch {
 
     Extent2D VulkanRenderer::GetFramebufferExtent() {
         return _platform->GetFramebufferExtent();
+    }
+
+    void VulkanRenderer::createInstance() {
+        VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
+        appInfo.apiVersion = VK_API_VERSION_1_2;
+        appInfo.pApplicationName = "Epoch";
+        appInfo.applicationVersion = VK_MAKE_VERSION( 1, 0, 0 );
+        appInfo.pEngineName = "No Engine";
+        appInfo.engineVersion = VK_MAKE_VERSION( 1, 0, 0 );
+
+        VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+        instanceCreateInfo.pApplicationInfo = &appInfo;
+
+        // Extensions
+        const char** pfe = nullptr;
+        U32 count = 0;
+        _platform->GetRequiredExtensions( &count, &pfe );
+        std::vector<const char*> platformExtensions;
+        for( U32 i = 0; i < count; ++i ) {
+            platformExtensions.push_back( pfe[i] );
+        }
+        platformExtensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
+
+        instanceCreateInfo.enabledExtensionCount = (U32)platformExtensions.size();
+        instanceCreateInfo.ppEnabledExtensionNames = platformExtensions.data();
+
+        // Validation layers
+        _requiredValidationLayers.push_back( "VK_LAYER_KHRONOS_validation" );
+
+        // Get available layers.
+        U32 availableLayerCount = 0;
+        VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, nullptr ) );
+        std::vector<VkLayerProperties> availableLayers( availableLayerCount );
+        VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, availableLayers.data() ) );
+
+        // Verify that all required layers are available.
+        bool success = true;
+        for( U32 i = 0; i < (U32)_requiredValidationLayers.size(); ++i ) {
+            bool found = false;
+            for( U32 j = 0; j < availableLayerCount; ++j ) {
+                if( strcmp( _requiredValidationLayers[i], availableLayers[j].layerName ) == 0 ) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if( !found ) {
+                success = false;
+                Logger::Fatal( "Required validation layer is missing: %s", _requiredValidationLayers[i] );
+                break;
+            }
+        }
+
+        instanceCreateInfo.enabledLayerCount = (U32)_requiredValidationLayers.size();
+        instanceCreateInfo.ppEnabledLayerNames = _requiredValidationLayers.data();
+
+        // Create instance
+        VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );
     }
 
     void VulkanRenderer::createShader( const char* name ) {
@@ -485,7 +498,6 @@ namespace Epoch {
         renderPassData.DepthRenderTargetOptions.OutputLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         VulkanRenderPassManager::CreateRenderPass( _device, renderPassData );
-        //VK_CHECK( vkCreateRenderPass( _device->LogicalDevice, &renderPassCreateInfo, nullptr, &_renderPass ) );
     }
 
     void VulkanRenderer::createGraphicsPipeline() {
@@ -799,17 +811,13 @@ namespace Epoch {
         _inFlightFences.resize( _swapchain->MaxFramesInFlight );
 
         for( U8 i = 0; i < _swapchain->MaxFramesInFlight; ++i ) {
-            VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-            VK_CHECK( vkCreateSemaphore( _device->LogicalDevice, &semaphoreCreateInfo, nullptr, &_imageAvailableSemaphores[i] ) );
-            VK_CHECK( vkCreateSemaphore( _device->LogicalDevice, &semaphoreCreateInfo, nullptr, &_renderCompleteSemaphores[i] ) );
-
-            VkFenceCreateInfo fenceCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+            _imageAvailableSemaphores[i] = new VulkanSemaphore( _device );
+            _renderCompleteSemaphores[i] = new VulkanSemaphore( _device );
 
             // Create the fence in a signaled state, indicating that the first frame has already been "rendered".
             // This will prevent the application from waiting indefinitely for the first frame to render since it
             // cannot be rendered until a frame is "rendered" before it.
-            fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-            VK_CHECK( vkCreateFence( _device->LogicalDevice, &fenceCreateInfo, nullptr, &_inFlightFences[i] ) );
+            _inFlightFences[i] = new VulkanFence( _device, true );
         }
 
         // In flight fences should not yet exist at this point, so clear the list.
@@ -855,8 +863,6 @@ namespace Epoch {
 
         // Cleanup the old swapchain.
         cleanupSwapchain();
-
-
 
         createRenderPass();
         createGraphicsPipeline();

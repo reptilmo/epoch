@@ -21,6 +21,11 @@ namespace Epoch {
         virtual const bool Initialize() = 0;
 
         /**
+         * Destroys this renderer, releasing all of its resources.
+         */
+        virtual void Destroy() = 0;
+
+        /**
          * Processes a single frame.
          * 
          * @param deltaTime The amount of time in seconds since the last frame.

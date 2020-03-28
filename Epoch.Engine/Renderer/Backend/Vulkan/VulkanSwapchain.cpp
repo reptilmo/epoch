@@ -9,6 +9,8 @@
 #include "VulkanImage.h"
 #include "VulkanRenderPassManager.h"
 #include "VulkanRenderPass.h"
+#include "VulkanFence.h"
+#include "VulkanSemaphore.h"
 #include "VulkanSwapchain.h"
 
 namespace Epoch {
@@ -37,14 +39,36 @@ namespace Epoch {
         createInternal();
     }
 
-    void VulkanSwapchain::Present( VkQueue graphicsQueue, VkQueue presentQueue, VkSemaphore renderCompleteSemaphore, const U32 presentImageIndex ) {
+    const bool VulkanSwapchain::AcquireNextImageIndex( const U64 timeoutNS, VulkanSemaphore* imageAvailableSemaphore, VulkanFence* fence, U32* imageIndex ) {
+        VkFence fenceHandle = nullptr;
+        if( fence ) {
+            fenceHandle = fence->GetHandle();
+        }
+        VkResult result = vkAcquireNextImageKHR( _device->LogicalDevice, _handle, timeoutNS, imageAvailableSemaphore->GetHandle(), fenceHandle, imageIndex );
+        if( result == VkResult::VK_ERROR_OUT_OF_DATE_KHR ) {
+            // Trigger swapchain recreation, then boot out of the render loop.
+            Extent2D extent = _device->FramebufferSize;
+            Recreate( extent.Width, extent.Height );
+            return false;
+        } else if( result != VkResult::VK_SUCCESS && result != VkResult::VK_SUBOPTIMAL_KHR ) {
+
+            // This is fatal and should crash the application.
+            Logger::Fatal( "Failed to acquire swapchain image!" );
+            return false;
+        }
+
+        return true;
+    }
+
+    void VulkanSwapchain::Present( VkQueue graphicsQueue, VkQueue presentQueue, VulkanSemaphore* renderCompleteSemaphore, const U32 presentImageIndex ) {
 
         // Return the image to the swapchain for presentation
+        VkSemaphore renderCompleteSem = renderCompleteSemaphore->GetHandle();
         VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &renderCompleteSemaphore;
+        presentInfo.pWaitSemaphores = &renderCompleteSem;
         presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = &_swapchain;
+        presentInfo.pSwapchains = &_handle;
         presentInfo.pImageIndices = &presentImageIndex;
         presentInfo.pResults = nullptr;
 
@@ -104,7 +128,7 @@ namespace Epoch {
         }
         _swapchainImages.clear();
 
-        vkDestroySwapchainKHR( _device->LogicalDevice, _swapchain, nullptr );
+        vkDestroySwapchainKHR( _device->LogicalDevice, _handle, nullptr );
     }
 
     void VulkanSwapchain::createInternal() {
@@ -187,14 +211,14 @@ namespace Epoch {
         swapchainCreateInfo.clipped = VK_TRUE;
         swapchainCreateInfo.oldSwapchain = nullptr;
 
-        VK_CHECK( vkCreateSwapchainKHR( _device->LogicalDevice, &swapchainCreateInfo, nullptr, &_swapchain ) );
+        VK_CHECK( vkCreateSwapchainKHR( _device->LogicalDevice, &swapchainCreateInfo, nullptr, &_handle ) );
 
         // Images
         U32 swapchainImageCount = 0;
-        vkGetSwapchainImagesKHR( _device->LogicalDevice, _swapchain, &swapchainImageCount, nullptr );
+        vkGetSwapchainImagesKHR( _device->LogicalDevice, _handle, &swapchainImageCount, nullptr );
         _swapchainImages.resize( swapchainImageCount );
         _swapchainImageViews.resize( swapchainImageCount );
-        vkGetSwapchainImagesKHR( _device->LogicalDevice, _swapchain, &swapchainImageCount, _swapchainImages.data() );
+        vkGetSwapchainImagesKHR( _device->LogicalDevice, _handle, &swapchainImageCount, _swapchainImages.data() );
 
         // Views
         for( U32 i = 0; i < swapchainImageCount; ++i ) {

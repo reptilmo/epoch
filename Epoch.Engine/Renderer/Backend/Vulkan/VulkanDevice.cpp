@@ -4,6 +4,7 @@
 #include "../../../Types.h"
 #include "../../../Logger.h"
 
+#include "VulkanCommandPool.h"
 #include "VulkanUtilities.h"
 #include "VulkanDevice.h"
 
@@ -27,7 +28,7 @@ namespace Epoch {
     VulkanDevice::~VulkanDevice() {
 
         if( CommandPool ) {
-            vkDestroyCommandPool( LogicalDevice, CommandPool, nullptr );
+            vkDestroyCommandPool( LogicalDevice, CommandPool->GetHandle(), nullptr );
         }
 
         if( LogicalDevice ) {
@@ -48,7 +49,7 @@ namespace Epoch {
     VkCommandBuffer VulkanDevice::AllocateAndBeginSingleUseCommandBuffer() {
         VkCommandBufferAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = CommandPool;
+        allocInfo.commandPool = CommandPool->GetHandle();
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer commandBuffer;
@@ -80,7 +81,7 @@ namespace Epoch {
         VK_CHECK( vkQueueWaitIdle( GraphicsQueue ) );
 
         // Free the command buffer
-        vkFreeCommandBuffers( LogicalDevice, CommandPool, 1, &commandBuffer );
+        vkFreeCommandBuffers( LogicalDevice, CommandPool->GetHandle(), 1, &commandBuffer );
     }
 
     void VulkanDevice::RequerySupport() {

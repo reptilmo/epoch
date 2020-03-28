@@ -16,6 +16,7 @@ namespace Epoch {
     RendererFrontEnd::~RendererFrontEnd() {
         _engine = nullptr;
         if( _backend ) {
+            _backend->Destroy();
             delete _backend;
             _backend = nullptr;
         }
@@ -26,6 +27,7 @@ namespace Epoch {
         // TODO: Choose this from configuration instead of hardcoding it.
         // TODO: Should probably be created via factory to prevent this class from knowing about the specific type.
         _backend = new VulkanRenderer( _engine->GetPlatform() );
+        _backend->Initialize();
 
         return true;
     }

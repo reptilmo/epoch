@@ -13,6 +13,8 @@ namespace Epoch {
         std::vector<VkPresentModeKHR> PresentationModes;
     };
 
+    class VulkanCommandPool;
+
     /**
      * Represents both the physical and logical device for Vulkan, as well as any device-specific
      * information they contain.
@@ -58,7 +60,7 @@ namespace Epoch {
         /**
          * The command pool associated with this device.
          */
-        VkCommandPool CommandPool;
+        VulkanCommandPool* CommandPool;
 
         /**
          *The format to be used for depth images/attachments.

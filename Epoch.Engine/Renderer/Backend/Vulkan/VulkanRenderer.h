@@ -22,6 +22,8 @@ namespace Epoch {
     class VulkanDebugger;
     class VulkanDevice;
     class VulkanSwapchain;
+    class VulkanFence;
+    class VulkanSemaphore;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
@@ -32,6 +34,11 @@ namespace Epoch {
 
         const bool Initialize() override;
 
+        /**
+         * Destroys this renderer, releasing all of its resources.
+         */
+        void Destroy() override;
+
         const bool Frame( const F32 deltaTime ) override;
 
         void OnEvent( const Event& event ) override;
@@ -41,6 +48,7 @@ namespace Epoch {
         Extent2D GetFramebufferExtent();
 
     private:
+        void createInstance();
         void createShader( const char* name );
         char* readShaderFile( const char* filename, const char* shaderType, U64* fileSize );
         void createRenderPass();
@@ -63,6 +71,8 @@ namespace Epoch {
     private:
         Platform* _platform;
 
+        std::vector<const char*> _requiredValidationLayers;
+
         VkInstance _instance;
         VulkanDevice* _device;
 
@@ -84,9 +94,6 @@ namespace Epoch {
         bool _recreatingSwapchain = false;
         bool _framebufferResizeOccurred = false;
 
-        //VkRenderPass _renderPass;
-
-
         // Command buffers
         std::vector<VkCommandBuffer> _commandBuffers;
 
@@ -94,16 +101,13 @@ namespace Epoch {
         VkPipeline _pipeline;
 
         // Sync objects
-        std::vector<VkSemaphore> _imageAvailableSemaphores;
-        std::vector<VkSemaphore> _renderCompleteSemaphores;
-        std::vector<VkFence> _inFlightFences;
-        std::vector<VkFence> _inFlightImageFences;
-
-        
+        std::vector<VulkanSemaphore*> _imageAvailableSemaphores;
+        std::vector<VulkanSemaphore*> _renderCompleteSemaphores;
+        std::vector<VulkanFence*> _inFlightFences;
+        std::vector<VulkanFence*> _inFlightImageFences;
 
         // 1 per swap chain image.
         std::vector<VulkanUniformBuffer*> _uniformBuffers;
-
 
         // Asset load temp
         VulkanVertex3DBuffer* _vertexBuffer;
