@@ -25,6 +25,7 @@ namespace Epoch {
     class VulkanCommandBuffer;
     class VulkanGraphicsPipeline;
     class VulkanTextureSampler;
+    class VulkanShader;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
@@ -40,6 +41,22 @@ namespace Epoch {
          */
         void Destroy() override;
 
+        /**
+         * Performs operations required for the next frame render.
+         *
+         * @param deltaTime The amount of time in seconds since the last frame.
+         *
+         * @returns True if Frame() should be called; otherwise false.
+         */
+        const bool PrepareFrame( const F32 deltaTime ) override;
+
+        /**
+         * Processes a single frame.
+         *
+         * @param deltaTime The amount of time in seconds since the last frame.
+         *
+         * @returns True on success, false on failure. Returning false crashes the application.
+         */
         const bool Frame( const F32 deltaTime ) override;
 
         void OnEvent( const Event& event ) override;
@@ -50,7 +67,6 @@ namespace Epoch {
 
     private:
         void createInstance();
-        void createShader( const char* name );
         void createRenderPass();
         void createGraphicsPipeline();
         
@@ -68,6 +84,7 @@ namespace Epoch {
         // Asset loading temp
         void createBuffers();
     private:
+        U32 _currentImageIndex;
         Platform* _platform;
 
         std::vector<const char*> _requiredValidationLayers;
@@ -79,10 +96,8 @@ namespace Epoch {
 
         VkSurfaceKHR _surface;
 
-        U64 _shaderStageCount;
-        std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
-        VkShaderModule _vertexShaderModule;
-        VkShaderModule _fragmentShaderModule;
+        VulkanShader* _vertexShader;
+        VulkanShader* _fragmentShader;
 
         // Descriptor pools/sets
         VkDescriptorPool _descriptorPool;

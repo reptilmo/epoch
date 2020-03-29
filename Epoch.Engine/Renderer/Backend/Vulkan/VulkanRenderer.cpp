@@ -14,9 +14,6 @@
 #include "../../../Math/Matrix4x4.h"
 #include "../../../Math/Vector3.h"
 #include "../../../Math/Quaternion.h"
-#include "../../../String/StringUtilities.h"
-
-#include "../../../Platform/FileHelper.h"
 
 #include "../../StandardUniformBufferObject.h"
 #include "../../../Resources/ITexture.h"
@@ -43,6 +40,7 @@
 #include "VulkanCommandBuffer.h"
 #include "VulkanPipeline.h"
 #include "VulkanTextureSampler.h"
+#include "VulkanShader.h"
 
 #include "VulkanRenderer.h"
 
@@ -79,7 +77,8 @@ namespace Epoch {
         _device->FramebufferSize = _platform->GetFramebufferExtent();
 
         // Shader creation.
-        createShader( "main" );
+        _vertexShader = new VulkanShader( _device, "main", ShaderType::Vertex );
+        _fragmentShader = new VulkanShader( _device, "main", ShaderType::Fragment );
 
 
         Extent2D extent = _platform->GetFramebufferExtent();
@@ -99,7 +98,7 @@ namespace Epoch {
         _textures[0] = (VulkanTexture*)GetTexture( "assets/textures/test512.png" );
         _textures[1] = (VulkanTexture*)GetTexture( "assets/textures/testice.jpg" );
 
-        // Create samplers
+        // Create samplers - one per in-flight frame
         _textureSamplers[0] = new VulkanTextureSampler( _device );
         _textureSamplers[1] = new VulkanTextureSampler( _device );
 
@@ -201,8 +200,15 @@ namespace Epoch {
             _swapchain = nullptr;
         }
 
-        vkDestroyShaderModule( _device->LogicalDevice, _vertexShaderModule, nullptr );
-        vkDestroyShaderModule( _device->LogicalDevice, _fragmentShaderModule, nullptr );
+        if( _vertexShader ) {
+            delete _vertexShader;
+            _vertexShader = nullptr;
+        }
+
+        if( _fragmentShader ) {
+            delete _fragmentShader;
+            _fragmentShader = nullptr;
+        }
 
         vkDestroySurfaceKHR( _instance, _surface, nullptr );
 
@@ -222,17 +228,17 @@ namespace Epoch {
         }
     }
 
-    const bool VulkanRenderer::Frame( const F32 deltaTime ) {
+    const bool VulkanRenderer::PrepareFrame( const F32 deltaTime ) {
 
         // If currently recreating the swapchain, boot out.
         if( _recreatingSwapchain ) {
-            return true;
+            return false;
         }
 
         if( _framebufferResizeOccurred ) {
             _framebufferResizeOccurred = false;
             recreateSwapchain();
-            return true;
+            return false;
         }
 
         // Wait for the execution of the current frame to complete. The fence being free will allow this to move on.
@@ -241,9 +247,8 @@ namespace Epoch {
         }
 
         // Acquire next image from the swap chain.
-        U32 imageIndex;
-        if( !_swapchain->AcquireNextImageIndex( U64_MAX, _imageAvailableSemaphores[_swapchain->GetCurrentFrameIndex()], nullptr, &imageIndex ) ) {
-            return true;
+        if( !_swapchain->AcquireNextImageIndex( U64_MAX, _imageAvailableSemaphores[_swapchain->GetCurrentFrameIndex()], nullptr, &_currentImageIndex ) ) {
+            return false;
         }
 
         // Update descriptors if need be. TEST: Swap texture
@@ -253,11 +258,12 @@ namespace Epoch {
             _currentTextureIndex = ( _currentTextureIndex == 0 ? 1 : 0 );
             _updatesTemp = 0;
         }
-        updateDescriptorSet( imageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
 
-        // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
+        // Update the current descriptor set.
+        updateDescriptorSet( _currentImageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
+
         // Begin recording.
-        _commandBuffers[imageIndex]->Begin();
+        _commandBuffers[_currentImageIndex]->Begin();
 
         // Begin the render pass. TODO: Should probably create these once and reuse.
         VulkanRenderPass* renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
@@ -266,10 +272,10 @@ namespace Epoch {
         clearInfo.RenderArea.Set( 0, 0, _swapchain->Extent.width, _swapchain->Extent.height );
         clearInfo.Depth = 1.0f;
         clearInfo.Stencil = 0;
-        _commandBuffers[imageIndex]->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( imageIndex ), renderPass );
+        _commandBuffers[_currentImageIndex]->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
 
         // Bind the buffer to the graphics pipeline
-        _graphicsPipeline->Bind( _commandBuffers[imageIndex] );
+        _graphicsPipeline->Bind( _commandBuffers[_currentImageIndex] );
 
         // TODO: These should be provided by the front end instead.
         const LinkedListNode<VulkanBufferDataBlock>* vBlock = _vertexBuffer->PeekDataBlock();
@@ -280,29 +286,33 @@ namespace Epoch {
             // Bind vertex buffers
             VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
             VkDeviceSize offsets[] = { vBlock->Value.Offset }; // was 0
-            vkCmdBindVertexBuffers( _commandBuffers[imageIndex]->GetHandle(), 0, 1, vertexBuffers, offsets );
+            vkCmdBindVertexBuffers( _commandBuffers[_currentImageIndex]->GetHandle(), 0, 1, vertexBuffers, offsets );
 
             // Bind index buffer
-            vkCmdBindIndexBuffer( _commandBuffers[imageIndex]->GetHandle(), _indexBuffer->GetHandle(), iBlock->Value.Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
+            vkCmdBindIndexBuffer( _commandBuffers[_currentImageIndex]->GetHandle(), _indexBuffer->GetHandle(), iBlock->Value.Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
 
             // Bind descriptor sets (UBOs and samplers)
-            vkCmdBindDescriptorSets( _commandBuffers[imageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[imageIndex], 0, nullptr );
+            vkCmdBindDescriptorSets( _commandBuffers[_currentImageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[_currentImageIndex], 0, nullptr );
 
             // Make the draw call. TODO: use object properties
             //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
 
-            vkCmdDrawIndexed( _commandBuffers[imageIndex]->GetHandle(), (U32)iBlock->Value.ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
+            vkCmdDrawIndexed( _commandBuffers[_currentImageIndex]->GetHandle(), (U32)iBlock->Value.ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
 
             vBlock = vBlock->Next;
             iBlock = iBlock->Next;
         }
 
         // End render pass.
-        _commandBuffers[imageIndex]->EndRenderPass();
+        _commandBuffers[_currentImageIndex]->EndRenderPass();
 
         // End recording
-        _commandBuffers[imageIndex]->End();
-        // ////////////////// END COMMAND BUFFERS ///////////////////////////////
+        _commandBuffers[_currentImageIndex]->End();
+
+        return true;
+    }
+
+    const bool VulkanRenderer::Frame( const F32 deltaTime ) {
 
         // Check if a previous frame is using this image (i.e. its fence is being waited on)
         U8 frameidx = _swapchain->GetCurrentFrameIndex();
@@ -314,7 +324,7 @@ namespace Epoch {
         _inFlightImageFences[frameidx] = _inFlightFences[frameidx];
 
         // UBO
-        updateUniformBuffers( imageIndex );
+        updateUniformBuffers( _currentImageIndex );
 
 
         // Submit the queue and wait for the operation to complete.
@@ -328,7 +338,7 @@ namespace Epoch {
         submitInfo.pWaitSemaphores = waitSemaphores; // Must be signaled from an operation completion before these commands will run.
         submitInfo.pWaitDstStageMask = waitStages; // Array aligning with pWaitSemaphores indicating which stage the wait will occur.
         submitInfo.commandBufferCount = 1;
-        VkCommandBuffer buf[1] = { _commandBuffers[imageIndex]->GetHandle() };
+        VkCommandBuffer buf[1] = { _commandBuffers[_currentImageIndex]->GetHandle() };
         submitInfo.pCommandBuffers = buf; // Command buffers to be executed (primary only).
 
         submitInfo.signalSemaphoreCount = 1;
@@ -341,7 +351,7 @@ namespace Epoch {
         VK_CHECK( vkQueueSubmit( _device->GraphicsQueue, 1, &submitInfo, _inFlightFences[frameidx]->GetHandle() ) );
 
         // Give the image back to the swapchain.
-        _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[frameidx], imageIndex );
+        _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[frameidx], _currentImageIndex );
 
         return true;
     }
@@ -427,37 +437,6 @@ namespace Epoch {
         VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );
     }
 
-    void VulkanRenderer::createShader( const char* name ) {
-
-        // Vertex shader
-        const char* vertFileName = StringUtilities::Format( "shaders/%s.%s.spv", name, "vert" );
-        VkShaderModuleCreateInfo vertexShaderCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        vertexShaderCreateInfo.pCode = (U32*)FileHelper::ReadFileBinaryToArray( vertFileName, &vertexShaderCreateInfo.codeSize );
-        VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &vertexShaderCreateInfo, nullptr, &_vertexShaderModule ) );
-
-        // Fragment shader
-        const char* fragFileName = StringUtilities::Format( "shaders/%s.%s.spv", name, "frag" );
-        VkShaderModuleCreateInfo fragShaderCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        fragShaderCreateInfo.pCode = (U32*)FileHelper::ReadFileBinaryToArray( fragFileName, &fragShaderCreateInfo.codeSize );
-        VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &fragShaderCreateInfo, nullptr, &_fragmentShaderModule ) );
-
-        // Vertex shader stage
-        VkPipelineShaderStageCreateInfo vertShaderStageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        vertShaderStageInfo.module = _vertexShaderModule;
-        vertShaderStageInfo.pName = "main";
-
-        // Fragment shader stage
-        VkPipelineShaderStageCreateInfo fragShaderStageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        fragShaderStageInfo.module = _fragmentShaderModule;
-        fragShaderStageInfo.pName = "main";
-
-        _shaderStageCount = 2;
-        _shaderStages.push_back( vertShaderStageInfo );
-        _shaderStages.push_back( fragShaderStageInfo );
-    }
-
     void VulkanRenderer::createRenderPass() {
 
         RenderPassData renderPassData;
@@ -492,7 +471,8 @@ namespace Epoch {
         info.Extent = _swapchain->Extent;
         info.Renderpass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
         info.DescriptorSetLayouts.push_back( _descriptorSetLayout );
-        info.ShaderStages = _shaderStages;
+        info.ShaderStages.push_back( _vertexShader->GetShaderStageCreateInfo() );
+        info.ShaderStages.push_back( _fragmentShader->GetShaderStageCreateInfo() );
 
         _graphicsPipeline = new VulkanGraphicsPipeline( _device, info );
     }

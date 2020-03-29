@@ -26,6 +26,15 @@ namespace Epoch {
         virtual void Destroy() = 0;
 
         /**
+         * Performs operations required for the next frame render.
+         *
+         * @param deltaTime The amount of time in seconds since the last frame.
+         *
+         * @returns True if Frame() should be called; otherwise false.
+         */
+        virtual const bool PrepareFrame( const F32 deltaTime ) = 0;
+
+        /**
          * Processes a single frame.
          * 
          * @param deltaTime The amount of time in seconds since the last frame.

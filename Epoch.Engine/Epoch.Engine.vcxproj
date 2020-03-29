@@ -149,6 +149,7 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderTarget.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanSemaphore.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanShader.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanSwapchain.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanTexture.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanTextureSampler.cpp" />
@@ -205,6 +206,7 @@
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderTarget.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanSemaphore.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanShader.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanSwapchain.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanTexture.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanTextureSampler.h" />

@@ -36,6 +36,11 @@ namespace Epoch {
 
         // TODO: All front-end work goes here (scene sorting, culling, etc) before the frame call.
 
+        // If the frame preparation indicates we should wait, boot out early.
+        if( !_backend->PrepareFrame( deltaTime ) ) {
+            return true;
+        }
+
         return _backend->Frame( deltaTime );
     }
 }
