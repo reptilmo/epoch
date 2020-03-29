@@ -292,10 +292,7 @@ namespace Epoch {
     }
 
     void VulkanDevice::createCommandPool() {
-        VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-        poolCreateInfo.queueFamilyIndex = GraphicsFamilyQueueIndex;
-        poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Reset the next time vkBeginCommandBuffer is called.
-        VK_CHECK( vkCreateCommandPool( LogicalDevice, &poolCreateInfo, nullptr, &CommandPool ) );
+        CommandPool = new VulkanCommandPool( this, GraphicsFamilyQueueIndex, true, false, false );
     }
 
     const bool VulkanDevice::detectDepthFormat() {

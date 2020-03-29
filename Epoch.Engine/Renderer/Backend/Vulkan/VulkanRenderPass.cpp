@@ -4,6 +4,7 @@
 
 #include "VulkanDevice.h"
 #include "VulkanUtilities.h"
+#include "VulkanCommandBuffer.h"
 #include "VulkanRenderPass.h"
 
 namespace Epoch {
@@ -158,7 +159,7 @@ namespace Epoch {
         _device = nullptr;
     }
 
-    void VulkanRenderPass::Begin( const RenderPassClearInfo& clearInfo, VkFramebuffer frameBuffer, VkCommandBuffer commandBuffer ) {
+    void VulkanRenderPass::Begin( const RenderPassClearInfo& clearInfo, VkFramebuffer frameBuffer, VulkanCommandBuffer* commandBuffer ) {
         VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
         renderPassBeginInfo.renderPass = _handle;
         renderPassBeginInfo.framebuffer = frameBuffer;
@@ -172,10 +173,10 @@ namespace Epoch {
         renderPassBeginInfo.clearValueCount = 2;
         renderPassBeginInfo.pClearValues = clearValues;
 
-        vkCmdBeginRenderPass( commandBuffer, &renderPassBeginInfo, VkSubpassContents::VK_SUBPASS_CONTENTS_INLINE );
+        vkCmdBeginRenderPass( commandBuffer->GetHandle(), &renderPassBeginInfo, VkSubpassContents::VK_SUBPASS_CONTENTS_INLINE );
     }
 
-    void VulkanRenderPass::End( VkCommandBuffer commandBuffer ) {
-        vkCmdEndRenderPass( commandBuffer );
+    void VulkanRenderPass::End( VulkanCommandBuffer* commandBuffer ) {
+        vkCmdEndRenderPass( commandBuffer->GetHandle() );
     }
 }

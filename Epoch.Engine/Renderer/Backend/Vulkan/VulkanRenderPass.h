@@ -8,6 +8,7 @@ namespace Epoch {
 
     class IRenderTarget;
     class VulkanDevice;
+    class VulkanCommandBuffer;
 
     struct RenderPassClearInfo {
         Vector4 Color;
@@ -24,9 +25,9 @@ namespace Epoch {
         VulkanRenderPass( VulkanDevice* device, RenderPassData renderPassData );
         ~VulkanRenderPass();
 
-        void Begin( const RenderPassClearInfo& clearInfo, VkFramebuffer frameBuffer, VkCommandBuffer commandBuffer );
+        void Begin( const RenderPassClearInfo& clearInfo, VkFramebuffer frameBuffer, VulkanCommandBuffer* commandBuffer );
 
-        void End( VkCommandBuffer commandBuffer );
+        void End( VulkanCommandBuffer* commandBuffer );
 
         const char* GetName() const { return _name; }
         VkRenderPass GetHandle() { return _handle; }

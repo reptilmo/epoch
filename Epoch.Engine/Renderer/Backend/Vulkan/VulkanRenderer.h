@@ -9,8 +9,6 @@
 
 namespace Epoch {
 
-    
-
     class ITexture;
 
     class Platform;    
@@ -24,6 +22,9 @@ namespace Epoch {
     class VulkanSwapchain;
     class VulkanFence;
     class VulkanSemaphore;
+    class VulkanCommandBuffer;
+    class VulkanGraphicsPipeline;
+    class VulkanTextureSampler;
 
     class VulkanRenderer final : public IRendererBackend, IEventHandler {
     public:
@@ -50,7 +51,6 @@ namespace Epoch {
     private:
         void createInstance();
         void createShader( const char* name );
-        char* readShaderFile( const char* filename, const char* shaderType, U64* fileSize );
         void createRenderPass();
         void createGraphicsPipeline();
         
@@ -59,7 +59,7 @@ namespace Epoch {
         void createDescriptorSetLayout();
         void createDescriptorPool();
         void createDescriptorSets();
-        void updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VkSampler sampler );
+        void updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VulkanTextureSampler* sampler );
         void createCommandBuffers();
         void createSyncObjects();
         void cleanupSwapchain();
@@ -67,7 +67,6 @@ namespace Epoch {
 
         // Asset loading temp
         void createBuffers();
-        void createTextureSampler( VkSampler* sampler );
     private:
         Platform* _platform;
 
@@ -95,10 +94,9 @@ namespace Epoch {
         bool _framebufferResizeOccurred = false;
 
         // Command buffers
-        std::vector<VkCommandBuffer> _commandBuffers;
+        std::vector<VulkanCommandBuffer*> _commandBuffers;
 
-        VkPipelineLayout _pipelineLayout;
-        VkPipeline _pipeline;
+        VulkanGraphicsPipeline* _graphicsPipeline;
 
         // Sync objects
         std::vector<VulkanSemaphore*> _imageAvailableSemaphores;
@@ -117,6 +115,6 @@ namespace Epoch {
         U64 _updatesTemp = 0;
         U64 _currentTextureIndex = 0;
         VulkanTexture* _textures[2];
-        VkSampler _textureSamplers[2];
+        VulkanTextureSampler* _textureSamplers[2];
     };
 }

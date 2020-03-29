@@ -14,6 +14,9 @@
 #include "../../../Math/Matrix4x4.h"
 #include "../../../Math/Vector3.h"
 #include "../../../Math/Quaternion.h"
+#include "../../../String/StringUtilities.h"
+
+#include "../../../Platform/FileHelper.h"
 
 #include "../../StandardUniformBufferObject.h"
 #include "../../../Resources/ITexture.h"
@@ -36,6 +39,10 @@
 #include "VulkanSemaphore.h"
 #include "VulkanRenderPass.h"
 #include "VulkanSwapchain.h"
+#include "VulkanCommandPool.h"
+#include "VulkanCommandBuffer.h"
+#include "VulkanPipeline.h"
+#include "VulkanTextureSampler.h"
 
 #include "VulkanRenderer.h"
 
@@ -43,7 +50,7 @@ namespace Epoch {
 
     VulkanRenderer::VulkanRenderer( Platform* platform ) {
         _platform = platform;
-        Logger::Trace( "Creating Vulkan renderer..." );        
+        Logger::Trace( "Creating Vulkan renderer..." );
     }
 
     VulkanRenderer::~VulkanRenderer() {
@@ -93,8 +100,8 @@ namespace Epoch {
         _textures[1] = (VulkanTexture*)GetTexture( "assets/textures/testice.jpg" );
 
         // Create samplers
-        createTextureSampler( &_textureSamplers[0] );
-        createTextureSampler( &_textureSamplers[1] );
+        _textureSamplers[0] = new VulkanTextureSampler( _device );
+        _textureSamplers[1] = new VulkanTextureSampler( _device );
 
         // TODO: load model
         createBuffers();
@@ -137,9 +144,12 @@ namespace Epoch {
         _renderCompleteSemaphores.clear();
 
         U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-
-        vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, _commandBuffers.size(), _commandBuffers.data() );
-        //vkFreeDescriptorSets( _device->LogicalDevice, _descriptorPool, swapchainImageCount, _descriptorSets.data() );
+        for( U64 i = 0; i < swapchainImageCount; ++i ) {
+            _device->CommandPool->FreeCommandBuffer( _commandBuffers[i] );
+        }
+        _commandBuffers.clear();
+        //vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, _commandBuffers.size(), _commandBuffers.data() );
+        
         vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPool, nullptr );
 
         for( auto buffer : _uniformBuffers ) {
@@ -158,17 +168,30 @@ namespace Epoch {
         }
 
         // TEMP
-        vkDestroySampler( _device->LogicalDevice, _textureSamplers[0], nullptr );
-        vkDestroySampler( _device->LogicalDevice, _textureSamplers[1], nullptr );
-        delete _textures[0];
-        _textures[0] = nullptr;
-        delete _textures[1];
-        _textures[1] = nullptr;
+        if( _textureSamplers[0] ) {
+            delete _textureSamplers[0];
+            _textureSamplers[0] = nullptr;
+        }
 
+        if( _textureSamplers[1] ) {
+            delete _textureSamplers[1];
+            _textureSamplers[1] = nullptr;
+        }
 
+        if( _textures[0] ) {
+            delete _textures[0];
+            _textures[0] = nullptr;
+        }
 
-        vkDestroyPipeline( _device->LogicalDevice, _pipeline, nullptr );
-        vkDestroyPipelineLayout( _device->LogicalDevice, _pipelineLayout, nullptr );
+        if( _textures[1] ) {
+            delete _textures[1];
+            _textures[1] = nullptr;
+        }
+
+        if( _graphicsPipeline ) {
+            delete _graphicsPipeline;
+            _graphicsPipeline = nullptr;
+        }
 
         vkDestroyDescriptorSetLayout( _device->LogicalDevice, _descriptorSetLayout, nullptr );
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
@@ -212,9 +235,6 @@ namespace Epoch {
             return true;
         }
 
-        // The operations here are asynchronous and not guaranteed to happen in order. Manage
-        // this with semaphores and fences.
-
         // Wait for the execution of the current frame to complete. The fence being free will allow this to move on.
         if( !_inFlightFences[_swapchain->GetCurrentFrameIndex()]->Wait( U64_MAX ) ) {
             Logger::Warn( "In-flight fence wait failure!" );
@@ -236,12 +256,8 @@ namespace Epoch {
         updateDescriptorSet( imageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
 
         // /////////////////////// BEGIN COMMAND BUFFERS ////////////////////////
-        // Prepare commands for the queue.
         // Begin recording.
-        VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-        beginInfo.flags = 0;
-        beginInfo.pInheritanceInfo = nullptr;
-        VK_CHECK( vkBeginCommandBuffer( _commandBuffers[imageIndex], &beginInfo ) );
+        _commandBuffers[imageIndex]->Begin();
 
         // Begin the render pass. TODO: Should probably create these once and reuse.
         VulkanRenderPass* renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
@@ -250,10 +266,10 @@ namespace Epoch {
         clearInfo.RenderArea.Set( 0, 0, _swapchain->Extent.width, _swapchain->Extent.height );
         clearInfo.Depth = 1.0f;
         clearInfo.Stencil = 0;
-        renderPass->Begin( clearInfo, _swapchain->GetFramebuffer( imageIndex ), _commandBuffers[imageIndex] );
+        _commandBuffers[imageIndex]->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( imageIndex ), renderPass );
 
         // Bind the buffer to the graphics pipeline
-        vkCmdBindPipeline( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline );
+        _graphicsPipeline->Bind( _commandBuffers[imageIndex] );
 
         // TODO: These should be provided by the front end instead.
         const LinkedListNode<VulkanBufferDataBlock>* vBlock = _vertexBuffer->PeekDataBlock();
@@ -264,29 +280,28 @@ namespace Epoch {
             // Bind vertex buffers
             VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
             VkDeviceSize offsets[] = { vBlock->Value.Offset }; // was 0
-            vkCmdBindVertexBuffers( _commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets );
+            vkCmdBindVertexBuffers( _commandBuffers[imageIndex]->GetHandle(), 0, 1, vertexBuffers, offsets );
 
             // Bind index buffer
-            vkCmdBindIndexBuffer( _commandBuffers[imageIndex], _indexBuffer->GetHandle(), iBlock->Value.Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
+            vkCmdBindIndexBuffer( _commandBuffers[imageIndex]->GetHandle(), _indexBuffer->GetHandle(), iBlock->Value.Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
 
             // Bind descriptor sets (UBOs and samplers)
-            vkCmdBindDescriptorSets( _commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1, &_descriptorSets[imageIndex], 0, nullptr );
+            vkCmdBindDescriptorSets( _commandBuffers[imageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[imageIndex], 0, nullptr );
 
             // Make the draw call. TODO: use object properties
             //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
 
-            vkCmdDrawIndexed( _commandBuffers[imageIndex], (U32)iBlock->Value.ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
+            vkCmdDrawIndexed( _commandBuffers[imageIndex]->GetHandle(), (U32)iBlock->Value.ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
 
             vBlock = vBlock->Next;
             iBlock = iBlock->Next;
         }
 
         // End render pass.
-        renderPass->End( _commandBuffers[imageIndex] );
+        _commandBuffers[imageIndex]->EndRenderPass();
 
         // End recording
-        VK_CHECK( vkEndCommandBuffer( _commandBuffers[imageIndex] ) );
-
+        _commandBuffers[imageIndex]->End();
         // ////////////////// END COMMAND BUFFERS ///////////////////////////////
 
         // Check if a previous frame is using this image (i.e. its fence is being waited on)
@@ -298,8 +313,8 @@ namespace Epoch {
         // Mark the image fence as in-use by this frame.
         _inFlightImageFences[frameidx] = _inFlightFences[frameidx];
 
+        // UBO
         updateUniformBuffers( imageIndex );
-
 
 
         // Submit the queue and wait for the operation to complete.
@@ -313,7 +328,8 @@ namespace Epoch {
         submitInfo.pWaitSemaphores = waitSemaphores; // Must be signaled from an operation completion before these commands will run.
         submitInfo.pWaitDstStageMask = waitStages; // Array aligning with pWaitSemaphores indicating which stage the wait will occur.
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &_commandBuffers[imageIndex]; // Command buffers to be executed (primary only).
+        VkCommandBuffer buf[1] = { _commandBuffers[imageIndex]->GetHandle() };
+        submitInfo.pCommandBuffers = buf; // Command buffers to be executed (primary only).
 
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
@@ -414,19 +430,15 @@ namespace Epoch {
     void VulkanRenderer::createShader( const char* name ) {
 
         // Vertex shader
-        U64 vertShaderSize;
-        char* vertexShaderSource = readShaderFile( name, "vert", &vertShaderSize );
+        const char* vertFileName = StringUtilities::Format( "shaders/%s.%s.spv", name, "vert" );
         VkShaderModuleCreateInfo vertexShaderCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        vertexShaderCreateInfo.codeSize = vertShaderSize;
-        vertexShaderCreateInfo.pCode = (U32*)vertexShaderSource;
+        vertexShaderCreateInfo.pCode = (U32*)FileHelper::ReadFileBinaryToArray( vertFileName, &vertexShaderCreateInfo.codeSize );
         VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &vertexShaderCreateInfo, nullptr, &_vertexShaderModule ) );
 
         // Fragment shader
-        U64 fragShaderSize;
-        char* fragShaderSource = readShaderFile( name, "frag", &fragShaderSize );
+        const char* fragFileName = StringUtilities::Format( "shaders/%s.%s.spv", name, "frag" );
         VkShaderModuleCreateInfo fragShaderCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        fragShaderCreateInfo.codeSize = fragShaderSize;
-        fragShaderCreateInfo.pCode = (U32*)fragShaderSource;
+        fragShaderCreateInfo.pCode = (U32*)FileHelper::ReadFileBinaryToArray( fragFileName, &fragShaderCreateInfo.codeSize );
         VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &fragShaderCreateInfo, nullptr, &_fragmentShaderModule ) );
 
         // Vertex shader stage
@@ -444,31 +456,6 @@ namespace Epoch {
         _shaderStageCount = 2;
         _shaderStages.push_back( vertShaderStageInfo );
         _shaderStages.push_back( fragShaderStageInfo );
-
-        delete vertexShaderSource;
-        delete fragShaderSource;
-    }
-
-    char* VulkanRenderer::readShaderFile( const char* filename, const char* shaderType, U64* fileSize ) {
-        char buffer[256];
-        I32 length = snprintf( buffer, 256, "shaders/%s.%s.spv", filename, shaderType );
-        if( length < 0 ) {
-            Logger::Fatal( "Shader filename is too long." );
-        }
-        buffer[length] = '\0';
-
-        std::ifstream file( buffer, std::ios::ate | std::ios::binary );
-        if( !file.is_open() ) {
-            Logger::Fatal( "Shader unable to open file." );
-        }
-
-        *fileSize = (U64)file.tellg();
-        char* fileBuffer = (char*)malloc( *fileSize );
-        file.seekg( 0 );
-        file.read( fileBuffer, *fileSize );
-        file.close();
-
-        return fileBuffer;
     }
 
     void VulkanRenderer::createRenderPass() {
@@ -501,164 +488,14 @@ namespace Epoch {
     }
 
     void VulkanRenderer::createGraphicsPipeline() {
+        PipelineInfo info;
+        info.Extent = _swapchain->Extent;
+        info.Renderpass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
+        info.DescriptorSetLayouts.push_back( _descriptorSetLayout );
+        info.ShaderStages = _shaderStages;
 
-        VkExtent2D extent = _swapchain->Extent;
-
-        // Viewport
-        VkViewport viewport = {};
-        viewport.x = 0.0f;
-        viewport.y = (F32)extent.height;
-        viewport.width = (F32)extent.width;
-        viewport.height = -(F32)extent.height;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-
-        // Scissor
-        VkRect2D scissor = {};
-        scissor.offset = { 0, 0 };
-        scissor.extent = { extent.width, extent.height };
-
-        // Viewport state
-        VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-        viewportState.viewportCount = 1;
-        viewportState.pViewports = &viewport;
-        viewportState.scissorCount = 1;
-        viewportState.pScissors = &scissor;
-
-        // Rasterizer
-        VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-        rasterizerCreateInfo.depthClampEnable = VK_FALSE;
-        rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-        rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-        rasterizerCreateInfo.lineWidth = 1.0f;
-        rasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;// VK_CULL_MODE_BACK_BIT;
-        rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; //VK_FRONT_FACE_COUNTER_CLOCKWISE // VK_FRONT_FACE_CLOCKWISE
-        rasterizerCreateInfo.depthBiasEnable = VK_FALSE;
-        rasterizerCreateInfo.depthBiasConstantFactor = 0.0f;
-        rasterizerCreateInfo.depthBiasClamp = 0.0f;
-        rasterizerCreateInfo.depthBiasSlopeFactor = 0.0f;
-
-        // Multisampling.
-        VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-        multisamplingCreateInfo.sampleShadingEnable = VK_FALSE;
-        multisamplingCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-        multisamplingCreateInfo.minSampleShading = 1.0f;
-        multisamplingCreateInfo.pSampleMask = nullptr;
-        multisamplingCreateInfo.alphaToCoverageEnable = VK_FALSE;
-        multisamplingCreateInfo.alphaToOneEnable = VK_FALSE;
-
-        // Depth and stencil testing.
-        VkPipelineDepthStencilStateCreateInfo depthStencil = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-        depthStencil.depthTestEnable = VK_TRUE;
-        depthStencil.depthWriteEnable = VK_TRUE;
-        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-        depthStencil.depthBoundsTestEnable = VK_FALSE;
-        depthStencil.stencilTestEnable = VK_FALSE;
-
-        VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
-        colorBlendAttachmentState.blendEnable = VK_FALSE;
-        colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-        VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-        colorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
-        colorBlendStateCreateInfo.logicOp = VK_LOGIC_OP_COPY;
-        colorBlendStateCreateInfo.attachmentCount = 1;
-        colorBlendStateCreateInfo.pAttachments = &colorBlendAttachmentState;
-        colorBlendStateCreateInfo.blendConstants[0] = 0.0f;
-        colorBlendStateCreateInfo.blendConstants[1] = 0.0f;
-        colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
-        colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
-
-        // Dynamic state
-        VkDynamicState dynamicStates[] = {
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_LINE_WIDTH
-        };
-
-        VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-        dynamicStateCreateInfo.dynamicStateCount = 2;
-        dynamicStateCreateInfo.pDynamicStates = dynamicStates;
-
-        // Vertex input
-        VkVertexInputBindingDescription bindingDescription;
-        bindingDescription.binding = 0; // Binding index
-        bindingDescription.stride = sizeof( Vertex3D );
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Move to next data entry for each vertex.
-
-        U32 offset = 0;
-        VkVertexInputAttributeDescription attributeDescriptions[4];
-        attributeDescriptions[0].binding = 0; // binding index - should match binding desc
-        attributeDescriptions[0].location = 0; // attrib location
-        attributeDescriptions[0].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
-        attributeDescriptions[0].offset = 0;
-        offset += sizeof( Vector3 );
-
-        attributeDescriptions[1].binding = 0; // binding index - should match binding desc
-        attributeDescriptions[1].location = 1; // attrib location
-        attributeDescriptions[1].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
-        attributeDescriptions[1].offset = offset;
-        offset += sizeof( Vector3 );
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offset;
-        offset += sizeof( Vector2 );
-
-        // Color
-        attributeDescriptions[3].binding = 0; // binding index - should match binding desc
-        attributeDescriptions[3].location = 3; // attrib location
-        attributeDescriptions[3].format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT; // 3x32-bit floats
-        attributeDescriptions[3].offset = offset;
-        offset += sizeof( Vector3 );
-
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-        vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-        vertexInputInfo.vertexAttributeDescriptionCount = 4;
-        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
-
-        // Input assembly 
-        VkPipelineInputAssemblyStateCreateInfo inputAssembly = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-        // Pipeline layout
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        pipelineLayoutCreateInfo.setLayoutCount = 1;
-        pipelineLayoutCreateInfo.pSetLayouts = &_descriptorSetLayout;
-        pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-        pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
-        VK_CHECK( vkCreatePipelineLayout( _device->LogicalDevice, &pipelineLayoutCreateInfo, nullptr, &_pipelineLayout ) );
-
-        // Pipeline create
-        VkGraphicsPipelineCreateInfo pipelineCreateInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-        pipelineCreateInfo.stageCount = (U32)_shaderStageCount;
-        pipelineCreateInfo.pStages = _shaderStages.data();
-        pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
-        pipelineCreateInfo.pInputAssemblyState = &inputAssembly;;
-        pipelineCreateInfo.pViewportState = &viewportState;
-        pipelineCreateInfo.pRasterizationState = &rasterizerCreateInfo;
-        pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
-        pipelineCreateInfo.pDepthStencilState = &depthStencil;
-        pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
-        pipelineCreateInfo.pDynamicState = nullptr;
-
-        pipelineCreateInfo.layout = _pipelineLayout;
-
-        // TODO: Get once and save
-        pipelineCreateInfo.renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" )->GetHandle();
-        pipelineCreateInfo.subpass = 0;
-        pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
-        pipelineCreateInfo.basePipelineIndex = -1;
-
-        VK_CHECK( vkCreateGraphicsPipelines( _device->LogicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &_pipeline ) );
-
-        Logger::Log( "Graphics pipeline created!" );
+        _graphicsPipeline = new VulkanGraphicsPipeline( _device, info );
     }
-
-
 
     void VulkanRenderer::createUniformBuffers() {
         VkDeviceSize bufferSize = sizeof( StandardUniformBufferObject );
@@ -755,7 +592,7 @@ namespace Epoch {
         VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, _descriptorSets.data() ) );
     }
 
-    void VulkanRenderer::updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VkSampler sampler ) {
+    void VulkanRenderer::updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VulkanTextureSampler* sampler ) {
 
         // Configure the descriptors for the given index..
         VkDescriptorBufferInfo bufferInfo = {};
@@ -766,7 +603,7 @@ namespace Epoch {
         VkDescriptorImageInfo imageInfo = {};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = textureImage->GetView();
-        imageInfo.sampler = sampler;
+        imageInfo.sampler = sampler->GetHandle();
 
         std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -790,18 +627,12 @@ namespace Epoch {
         vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
     }
 
-
-
     void VulkanRenderer::createCommandBuffers() {
         U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-        VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        commandBufferAllocateInfo.commandPool = _device->CommandPool;
-        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        commandBufferAllocateInfo.commandBufferCount = swapchainImageCount;
-
-        _commandBuffers.resize( swapchainImageCount );
-
-        VK_CHECK( vkAllocateCommandBuffers( _device->LogicalDevice, &commandBufferAllocateInfo, _commandBuffers.data() ) );
+        for( U32 i = 0; i < swapchainImageCount; ++i ) {
+            VulkanCommandBuffer* cmdBuf = _device->CommandPool->AllocateCommandBuffer( true );
+            _commandBuffers.push_back( cmdBuf );
+        }
     }
 
     void VulkanRenderer::createSyncObjects() {
@@ -831,11 +662,17 @@ namespace Epoch {
 
 
         // Free the command buffers in the pool, but do not destroy the pool.
-        vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, (U32)_commandBuffers.size(), _commandBuffers.data() );
+        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
+        for( U32 i = 0; i < swapchainImageCount; ++i ) {
+            _device->CommandPool->FreeCommandBuffer( _commandBuffers[i] );
+        }
         _commandBuffers.clear();
 
-        vkDestroyPipeline( _device->LogicalDevice, _pipeline, nullptr );
-        vkDestroyPipelineLayout( _device->LogicalDevice, _pipelineLayout, nullptr );
+        if( _graphicsPipeline ) {
+            delete _graphicsPipeline;
+            _graphicsPipeline = nullptr;
+        }
+        
 
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
@@ -867,8 +704,6 @@ namespace Epoch {
         createRenderPass();
         createGraphicsPipeline();
         _swapchain->RegenerateFramebuffers();
-        //createDepthResources();
-        //createFramebuffers();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
@@ -940,27 +775,5 @@ namespace Epoch {
             vertOffset += ( sizeof( Vertex3D ) * mesh.Vertices.size() );
             indexOffset += ( sizeof( U32 ) * mesh.Indices.size() );
         }
-    }
-
-    void VulkanRenderer::createTextureSampler( VkSampler* sampler ) {
-        VkSamplerCreateInfo samplerInfo = {};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = 16;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        VK_CHECK( vkCreateSampler( _device->LogicalDevice, &samplerInfo, nullptr, &*sampler ) );
     }
 }

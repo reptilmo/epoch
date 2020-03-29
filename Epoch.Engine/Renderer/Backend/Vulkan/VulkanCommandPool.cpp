@@ -1,6 +1,7 @@
 
 #include "VulkanDevice.h"
 #include "VulkanUtilities.h"
+#include "VulkanCommandBuffer.h"
 #include "VulkanCommandPool.h"
 
 namespace Epoch {
@@ -32,5 +33,30 @@ namespace Epoch {
 
         _queueFamilyIndex = -1;
         _device = nullptr;
+    }
+
+    VulkanCommandBuffer* VulkanCommandPool::AllocateCommandBuffer( const bool isPrimary ) {
+        if( _availableBuffers.size() == 0 ) {
+            VkCommandBuffer handle;
+            VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+            commandBufferAllocateInfo.commandPool = _handle;
+            commandBufferAllocateInfo.level = isPrimary ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+            commandBufferAllocateInfo.commandBufferCount = 1;
+
+            VK_CHECK( vkAllocateCommandBuffers( _device->LogicalDevice, &commandBufferAllocateInfo, &handle ) );
+            return new VulkanCommandBuffer( handle, this, isPrimary );
+        } else {
+            // TODO: recycle these objects.
+        }
+
+    }
+
+    void VulkanCommandPool::FreeCommandBuffer( VulkanCommandBuffer* commandBuffer ) {
+        VkCommandBuffer handle = commandBuffer->GetHandle();
+        vkFreeCommandBuffers( _device->LogicalDevice, _handle, 1, &handle );
+        
+        // TODO: recycle these objects.
+        delete commandBuffer;
+        commandBuffer = nullptr;
     }
 }

@@ -130,10 +130,12 @@
     <ClCompile Include="Math\Vector2.cpp" />
     <ClCompile Include="Math\Vector3.cpp" />
     <ClCompile Include="Math\Vector4.cpp" />
+    <ClCompile Include="Platform\FileHelper.cpp" />
     <ClCompile Include="Platform\Platform.cpp" />
     <ClCompile Include="Platform\TGLFWWindow.cpp" />
     <ClCompile Include="Platform\Windows\WindowsApplication.cpp" />
     <ClCompile Include="Platform\Windows\WindowsWindow.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanCommandBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanCommandPool.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanDebugger.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanDevice.cpp" />
@@ -141,6 +143,7 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanImage.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanInternalBuffer.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanPipeline.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPass.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.cpp" />
@@ -148,6 +151,7 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanSemaphore.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanSwapchain.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanTexture.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanTextureSampler.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanUniformBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanUtilities.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.cpp" />
@@ -179,6 +183,7 @@
     <ClInclude Include="Memory\BlockAllocator.h" />
     <ClInclude Include="Memory\DynamicBlockAllocator.h" />
     <ClInclude Include="Memory\Memory.h" />
+    <ClInclude Include="Platform\FileHelper.h" />
     <ClInclude Include="Platform\IApplication.h" />
     <ClInclude Include="Platform\TGLFWWindow.h" />
     <ClInclude Include="Platform\IWindow.h" />
@@ -195,12 +200,14 @@
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanFence.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanInternalBuffer.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanPipeline.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderPass.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderTarget.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanSemaphore.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanSwapchain.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanTexture.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanTextureSampler.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanUniformBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.h" />
     <ClInclude Include="Renderer\Frontend\RendererFrontend.h" />
