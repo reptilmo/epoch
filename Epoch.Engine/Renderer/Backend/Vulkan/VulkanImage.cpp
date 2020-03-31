@@ -2,6 +2,7 @@
 #include "../../../Logger.h"
 
 #include "VulkanUtilities.h"
+#include "VulkanCommandBuffer.h"
 #include "VulkanDevice.h"
 #include "VulkanImage.h"
 
@@ -67,7 +68,7 @@ namespace Epoch {
     }
 
     void VulkanImage::TransitionLayout( VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout ) {
-        VkCommandBuffer commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
+        VulkanCommandBuffer* commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
 
         VkImageMemoryBarrier barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -104,7 +105,7 @@ namespace Epoch {
         }
 
         vkCmdPipelineBarrier(
-            commandBuffer,
+            commandBuffer->GetHandle(),
             sourceStage, destinationStage,
             0,
             0, nullptr,
@@ -116,7 +117,7 @@ namespace Epoch {
     }
 
     void VulkanImage::CopyFromBuffer( VkBuffer buffer ) {
-        VkCommandBuffer commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
+        VulkanCommandBuffer* commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
 
         VkBufferImageCopy region = {};
         region.bufferOffset = 0;
@@ -136,7 +137,7 @@ namespace Epoch {
         };
 
         vkCmdCopyBufferToImage(
-            commandBuffer,
+            commandBuffer->GetHandle(),
             buffer,
             _imageHandle,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

@@ -42,6 +42,8 @@ namespace Epoch {
          */
         VkFence GetHandle() { return _handle; }
 
+        const bool IsSignaled() const { return _state == VulkanFenceState::Signaled; }
+
         enum class VulkanFenceState {
 
             // Initial state, unless created signaled.

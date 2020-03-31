@@ -11,6 +11,7 @@
 #include "VulkanRenderPass.h"
 #include "VulkanFence.h"
 #include "VulkanSemaphore.h"
+#include "VulkanQueue.h"
 #include "VulkanSwapchain.h"
 
 namespace Epoch {
@@ -60,7 +61,7 @@ namespace Epoch {
         return true;
     }
 
-    void VulkanSwapchain::Present( VkQueue graphicsQueue, VkQueue presentQueue, VulkanSemaphore* renderCompleteSemaphore, const U32 presentImageIndex ) {
+    void VulkanSwapchain::Present( VulkanQueue* graphicsQueue, VulkanQueue* presentQueue, VulkanSemaphore* renderCompleteSemaphore, const U32 presentImageIndex ) {
 
         // Return the image to the swapchain for presentation
         VkSemaphore renderCompleteSem = renderCompleteSemaphore->GetHandle();
@@ -72,7 +73,7 @@ namespace Epoch {
         presentInfo.pImageIndices = &presentImageIndex;
         presentInfo.pResults = nullptr;
 
-        VkResult result = vkQueuePresentKHR( _device->PresentationQueue, &presentInfo );
+        VkResult result = vkQueuePresentKHR( presentQueue->GetHandle(), &presentInfo );
         if( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ) {
             // Swapchain is out of date, suboptimal or a framebuffer resize has occurred. Trigger swapchain recreation.
             Extent2D extent = _device->FramebufferSize;

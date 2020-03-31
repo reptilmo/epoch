@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <vulkan/vulkan.h>
 
 #include "../../../Defines.h"
@@ -8,9 +9,22 @@ namespace Epoch {
 
     class VulkanCommandPool;
     class VulkanRenderPass;
+    class VulkanSemaphore;
     struct RenderPassClearInfo;
 
+    enum class CommandBufferState {
+        Ready,
+        Recording,
+        InRenderPass,
+        RecordingEnded,
+        Submitted,
+        NotAllocated
+    };
+
     class VulkanCommandBuffer {
+        friend class VulkanQueue;
+    public:
+
     public:
         VulkanCommandBuffer( VkCommandBuffer handle, VulkanCommandPool* owner, const bool isPrimary );
         ~VulkanCommandBuffer();
@@ -33,7 +47,14 @@ namespace Epoch {
 
         void EndRenderPass();
 
+        void AddWaitSemaphore( VkPipelineStageFlags waitFlags, VulkanSemaphore* waitSemaphore );
+        void UpdateSubmitted();
+        void Reset();
+
         VkCommandBuffer GetHandle() { return _handle; }
+
+        const std::vector<VulkanSemaphore*>& GetWaitSemaphores() { return _waitSemaphores; }
+        const std::vector<VkPipelineStageFlags>& GetWaitFlags() { return _waitFlags; }
 
         FORCEINLINE const bool IsInRenderPass() const {
             return _state == CommandBufferState::InRenderPass;
@@ -55,20 +76,14 @@ namespace Epoch {
             return _state != CommandBufferState::NotAllocated;
         }
 
-        enum class CommandBufferState {
-            Ready,
-            Recording,
-            InRenderPass,
-            RecordingEnded,
-            Submitted,
-            NotAllocated
-        };
-
     private:
         bool _isPrimary;
         VkCommandBuffer _handle;
         VulkanCommandPool* _owner;
         CommandBufferState _state;
         VulkanRenderPass* _currentRenderPass;
+        std::vector<VkPipelineStageFlags> _waitFlags;
+        std::vector<VulkanSemaphore*> _waitSemaphores;
+        std::vector<VulkanSemaphore*> _submittedWaitSemaphores;
     };
 }

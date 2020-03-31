@@ -36,7 +36,7 @@ namespace Epoch {
          */
         const bool AcquireNextImageIndex( const U64 timeoutNS, VulkanSemaphore* imageAvailableSemaphore, VulkanFence* fence, U32* imageIndex );
 
-        void Present( VkQueue graphicsQueue, VkQueue presentQueue, VulkanSemaphore* renderCompleteSemaphore, const U32 presentImageIndex );
+        void Present( VulkanQueue* graphicsQueue, VulkanQueue* presentQueue, VulkanSemaphore* renderCompleteSemaphore, const U32 presentImageIndex );
 
         const U32 GetSwapchainImageCount() const { return (U32)_swapchainImages.size(); }
         VkSwapchainKHR GetHandle() { return _handle; }

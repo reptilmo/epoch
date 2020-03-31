@@ -5,7 +5,9 @@
 #include "../../../Logger.h"
 
 #include "VulkanCommandPool.h"
+#include "VulkanCommandBuffer.h"
 #include "VulkanUtilities.h"
+#include "VulkanQueue.h"
 #include "VulkanDevice.h"
 
 
@@ -46,42 +48,16 @@ namespace Epoch {
         PresentationQueue = nullptr;
     }
 
-    VkCommandBuffer VulkanDevice::AllocateAndBeginSingleUseCommandBuffer() {
-        VkCommandBufferAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = CommandPool->GetHandle();
-        allocInfo.commandBufferCount = 1;
-
-        VkCommandBuffer commandBuffer;
-        VK_CHECK( vkAllocateCommandBuffers( LogicalDevice, &allocInfo, &commandBuffer ) );
-
-        // Mark the buffer as only being used once.
-        VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        // Begin recording.
-        VK_CHECK( vkBeginCommandBuffer( commandBuffer, &beginInfo ) );
-
+    VulkanCommandBuffer* VulkanDevice::AllocateAndBeginSingleUseCommandBuffer() {
+        VulkanCommandBuffer* commandBuffer = CommandPool->AllocateCommandBuffer( true );
+        commandBuffer->Begin( true, false, false );
         return commandBuffer;
     }
 
-    void VulkanDevice::EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer ) {
-        // End recording
-        VK_CHECK( vkEndCommandBuffer( commandBuffer ) );
-
-        // Prepare to submit
-        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-
-        // NOTE: May want to set up a new queue for this.
-        VK_CHECK( vkQueueSubmit( GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
-
-        // Wait for the queue to finish
-        VK_CHECK( vkQueueWaitIdle( GraphicsQueue ) );
-
-        // Free the command buffer
-        vkFreeCommandBuffers( LogicalDevice, CommandPool->GetHandle(), 1, &commandBuffer );
+    void VulkanDevice::EndSingleUseCommandBuffer( VulkanCommandBuffer* commandBuffer ) {
+        commandBuffer->End();
+        GraphicsQueue->Submit( commandBuffer, nullptr, 0, nullptr, true );
+        CommandPool->FreeCommandBuffer( commandBuffer );
     }
 
     void VulkanDevice::RequerySupport() {
@@ -287,8 +263,9 @@ namespace Epoch {
     }
 
     void VulkanDevice::createQueues() {
-        vkGetDeviceQueue( LogicalDevice, GraphicsFamilyQueueIndex, 0, &GraphicsQueue );
-        vkGetDeviceQueue( LogicalDevice, PresentationFamilyQueueIndex, 0, &PresentationQueue );
+
+        GraphicsQueue = new VulkanQueue( this, GraphicsFamilyQueueIndex );
+        PresentationQueue = new VulkanQueue( this, PresentationFamilyQueueIndex );
     }
 
     void VulkanDevice::createCommandPool() {

@@ -144,6 +144,7 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanInternalBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanPipeline.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanQueue.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPass.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.cpp" />
@@ -202,6 +203,7 @@
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanIndexBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanInternalBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanPipeline.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanQueue.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderPass.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderTarget.h" />

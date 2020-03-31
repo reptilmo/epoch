@@ -40,6 +40,7 @@
 #include "VulkanCommandBuffer.h"
 #include "VulkanPipeline.h"
 #include "VulkanTextureSampler.h"
+#include "VulkanQueue.h"
 #include "VulkanShader.h"
 
 #include "VulkanRenderer.h"
@@ -315,43 +316,29 @@ namespace Epoch {
     const bool VulkanRenderer::Frame( const F32 deltaTime ) {
 
         // Check if a previous frame is using this image (i.e. its fence is being waited on)
-        U8 frameidx = _swapchain->GetCurrentFrameIndex();
-        if( _inFlightImageFences[frameidx] != VK_NULL_HANDLE ) {
-            _inFlightImageFences[frameidx]->Wait( U64_MAX );
+        U8 swapchainFrameIndex = _swapchain->GetCurrentFrameIndex();
+        if( _inFlightImageFences[swapchainFrameIndex] != VK_NULL_HANDLE ) {
+            _inFlightImageFences[swapchainFrameIndex]->Wait( U64_MAX );
         }
 
         // Mark the image fence as in-use by this frame.
-        _inFlightImageFences[frameidx] = _inFlightFences[frameidx];
+        _inFlightImageFences[swapchainFrameIndex] = _inFlightFences[swapchainFrameIndex];
 
         // UBO
         updateUniformBuffers( _currentImageIndex );
 
+        // Reset the fence for use on the next frame.
+        _inFlightImageFences[swapchainFrameIndex]->Reset();
+
+        // Ensure that the operation cannot begin until the image is available.
+        _commandBuffers[_currentImageIndex]->AddWaitSemaphore( VK_STRUCTURE_TYPE_SUBMIT_INFO, _imageAvailableSemaphores[swapchainFrameIndex] );
 
         // Submit the queue and wait for the operation to complete.
-        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-
-        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[frameidx]->GetHandle() };
-        VkSemaphore signalSemaphores[] = { _renderCompleteSemaphores[frameidx]->GetHandle() };
-        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = waitSemaphores; // Must be signaled from an operation completion before these commands will run.
-        submitInfo.pWaitDstStageMask = waitStages; // Array aligning with pWaitSemaphores indicating which stage the wait will occur.
-        submitInfo.commandBufferCount = 1;
-        VkCommandBuffer buf[1] = { _commandBuffers[_currentImageIndex]->GetHandle() };
-        submitInfo.pCommandBuffers = buf; // Command buffers to be executed (primary only).
-
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
-        // Reset the fence for use on the next frame.
-        _inFlightImageFences[frameidx]->Reset();
-
-        // Submit the queue
-        VK_CHECK( vkQueueSubmit( _device->GraphicsQueue, 1, &submitInfo, _inFlightFences[frameidx]->GetHandle() ) );
+        VkSemaphore signalSemaphores[] = { _renderCompleteSemaphores[swapchainFrameIndex]->GetHandle() };
+        _device->GraphicsQueue->Submit( _commandBuffers[_currentImageIndex], _inFlightFences[swapchainFrameIndex], 1, signalSemaphores, false );
 
         // Give the image back to the swapchain.
-        _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[frameidx], _currentImageIndex );
+        _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[swapchainFrameIndex], _currentImageIndex );
 
         return true;
     }

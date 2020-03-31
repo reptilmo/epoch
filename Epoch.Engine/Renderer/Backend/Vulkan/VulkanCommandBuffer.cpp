@@ -56,4 +56,21 @@ namespace Epoch {
         _currentRenderPass->End( this );
         _state = CommandBufferState::Recording;
     }
+
+    void VulkanCommandBuffer::AddWaitSemaphore( VkPipelineStageFlags waitFlags, VulkanSemaphore* waitSemaphore ) {
+        _waitFlags.push_back( waitFlags );
+        _waitSemaphores.push_back( waitSemaphore );
+    }
+
+    void VulkanCommandBuffer::UpdateSubmitted() {
+        _submittedWaitSemaphores = _waitSemaphores;
+        _waitSemaphores.clear();
+        _waitFlags.clear();
+    }
+
+    void VulkanCommandBuffer::Reset() {
+        _waitFlags.clear();
+        _waitSemaphores.clear();
+        _submittedWaitSemaphores.clear();
+    }
 }
