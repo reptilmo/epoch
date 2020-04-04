@@ -3,6 +3,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include "../../../Types.h"
+
 namespace Epoch {
 
     struct VulkanSwapchainSupportDetails {
@@ -10,6 +12,10 @@ namespace Epoch {
         std::vector<VkSurfaceFormatKHR> Formats;
         std::vector<VkPresentModeKHR> PresentationModes;
     };
+
+    class VulkanCommandPool;
+    class VulkanQueue;
+    class VulkanCommandBuffer;
 
     /**
      * Represents both the physical and logical device for Vulkan, as well as any device-specific
@@ -41,12 +47,12 @@ namespace Epoch {
         /**
          * The queue used for graphics pipeline commands.
          */
-        VkQueue GraphicsQueue;
+        VulkanQueue* GraphicsQueue;
 
         /**
          * The queue used for presentation commands.
          */
-        VkQueue PresentationQueue;
+        VulkanQueue* PresentationQueue;
 
         /**
          * Contains swapchain support details.
@@ -56,12 +62,17 @@ namespace Epoch {
         /**
          * The command pool associated with this device.
          */
-        VkCommandPool CommandPool;
+        VulkanCommandPool* CommandPool;
 
         /**
          *The format to be used for depth images/attachments.
          */
         VkFormat DepthFormat;
+
+        /**
+         * TODO: Stop-gap until platform is removed.
+         */
+        Extent2D FramebufferSize;
 
     public:
         /**
@@ -85,13 +96,13 @@ namespace Epoch {
          *
          * @return A pointer to the newly-allocated command buffer.
          */
-        VkCommandBuffer AllocateAndBeginSingleUseCommandBuffer();
+        VulkanCommandBuffer* AllocateAndBeginSingleUseCommandBuffer();
 
         /**
          * Ends recording of the given command buffer and submits it for execution. This function
          * waits until the execution of the queue is complete, then frees it before returning.
          */
-        void EndSingleUseCommandBuffer( VkCommandBuffer commandBuffer );
+        void EndSingleUseCommandBuffer( VulkanCommandBuffer* commandBuffer );
 
         /**
          * Re-query device support details.

@@ -10,10 +10,14 @@ namespace Epoch {
     }
 
     void Event::Post( const bool immediate ) {
-        EventManager::Post( *this, immediate );
+        EventManager::Post( this, immediate );
     }
 
     void Event::Listen( const EventType type, IEventHandler* handler ) {
         EventManager::Listen( type, handler );
+    }
+
+    void Event::StopListening( const EventType type, IEventHandler* handler ) {
+        EventManager::StopListening( type, handler );
     }
 }

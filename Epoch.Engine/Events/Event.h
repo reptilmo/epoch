@@ -9,6 +9,7 @@ namespace Epoch {
     enum class EventType : U64 {
         UNKNOWN,
         WINDOW_RESIZED,
+        ASSET_LOADED,
 
         EVENT_TYPE_MAX_EVENT_ID
     };
@@ -50,5 +51,7 @@ namespace Epoch {
          * @param handler The event handler to register.
          */
         static void Listen( const EventType type, IEventHandler* handler );
+
+        static void StopListening( const EventType type, IEventHandler* handler );
     };
 }

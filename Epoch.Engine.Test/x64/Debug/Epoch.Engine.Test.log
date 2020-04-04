@@ -1,3 +1,5 @@
-﻿  LinkedList.Test.cpp
+﻿  pch.cpp
+  LinkedList.Test.cpp
 C:\Development\epoch\Epoch.Engine\Containers\LinkedList.h(195): warning C4715: 'Epoch::LinkedList<int>::InsertAt': not all control paths return a value
+     Creating library C:\Development\epoch\x64\Debug\Epoch.Engine.Test.lib and object C:\Development\epoch\x64\Debug\Epoch.Engine.Test.exp
   Epoch.Engine.Test.vcxproj -> C:\Development\epoch\x64\Debug\Epoch.Engine.Test.dll

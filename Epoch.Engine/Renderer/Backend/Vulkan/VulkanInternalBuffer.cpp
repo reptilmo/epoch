@@ -1,7 +1,7 @@
 
 #include "VulkanUtilities.h"
 #include "VulkanDevice.h"
-
+#include "VulkanCommandBuffer.h"
 #include "VulkanInternalBuffer.h"
 
 namespace Epoch {
@@ -72,14 +72,14 @@ namespace Epoch {
         ASSERT_MSG( _device == other->_device, "Buffers must be attached to the same device." );
 
         // Create a one-time use command buffer
-        VkCommandBuffer commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
+        VulkanCommandBuffer* commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
 
         // Write the copy command.
         VkBufferCopy copyRegion = {};
         copyRegion.srcOffset = sourceOffset;
         copyRegion.dstOffset = destinationOffset;
         copyRegion.size = size;
-        vkCmdCopyBuffer( commandBuffer, _handle, other->_handle, 1, &copyRegion );
+        vkCmdCopyBuffer( commandBuffer->GetHandle(), _handle, other->_handle, 1, &copyRegion );
 
         _device->EndSingleUseCommandBuffer( commandBuffer );
     }
@@ -88,14 +88,14 @@ namespace Epoch {
         ASSERT_MSG( _device == other->_device, "Buffers must be attached to the same device." );
 
         // Create a one-time use command buffer
-        VkCommandBuffer commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
+        VulkanCommandBuffer* commandBuffer = _device->AllocateAndBeginSingleUseCommandBuffer();
 
         // Write the copy command.
         VkBufferCopy copyRegion = {};
         copyRegion.srcOffset = sourceOffset;
         copyRegion.dstOffset = destinationOffset;
         copyRegion.size = size;
-        vkCmdCopyBuffer( commandBuffer, other->_handle, _handle, 1, &copyRegion );
+        vkCmdCopyBuffer( commandBuffer->GetHandle(), other->_handle, _handle, 1, &copyRegion );
 
         _device->EndSingleUseCommandBuffer( commandBuffer );
     }

@@ -5,7 +5,6 @@
 namespace Epoch {
 
     class Platform;
-    class RendererFrontEnd;
 
     /**
      * The main class which manages everything in the system. One of these is created
@@ -42,10 +41,9 @@ namespace Epoch {
          *
          * @param deltaTime The time in seconds since the last loop.
          */
-        void OnLoop( const F32 deltaTime );
+        const bool OnLoop( const F32 deltaTime );
 
     private:
         Platform* _platform;
-        RendererFrontEnd* _renderer;
     };
 }

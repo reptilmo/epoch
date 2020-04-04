@@ -1,6 +1,7 @@
 
 #include <map>
 #include <vector>
+#include <queue>
 
 #include "../Logger.h"
 
@@ -8,23 +9,26 @@
 
 namespace Epoch {
 
+    // Private event queue
+    std::queue<const Event*> _eventQueue;
+
     // Private, static map of events:handlers.
     std::map<const EventType, std::vector<IEventHandler*>*> _entries;
 
-    void EventManager::Post( const Event event, const bool immediate ) {
-        auto entry = _entries.find( event.Type );
+    void EventManager::Post( const Event* event, const bool immediate ) {
+        auto entry = _entries.find( event->Type );
         if( entry == _entries.end() ) {
             Logger::Trace( "EventManager::Post called for event type with no handlers listening." );
             return;
         } else {
             if( immediate ) {
-                for( auto handler : *( ( *entry ).second ) ) {
-                    handler->OnEvent( event );
-                }
-            } else {
 
-                // TODO: Support queued events, which happen on the next frame.
-                Logger::Fatal( "Non-immediate events not yet supported!" );
+                // TODO: Should probably be using an object pool for this instead of new/delete.
+                processEvent( event );
+                delete event;
+                event = nullptr;
+            } else {
+                _eventQueue.push( event );
             }
         }
     }
@@ -64,5 +68,32 @@ namespace Epoch {
         }
 
         handlers.erase( it );
+    }
+
+    void EventManager::Update( const F32 deltaTime ) {
+
+        U32 processed = 0;
+        while( !_eventQueue.empty() ) {
+            const Event* e = _eventQueue.front();
+            _eventQueue.pop();
+            processEvent( e );
+            delete e;
+            e = nullptr;
+
+            processed++;
+
+            // TODO: make this configurable.
+            if( processed > 50 ) {
+                Logger::Trace( "Too many messages to process on a single frame, deferring to next frame." );
+                break;
+            }
+        }
+    }
+
+    void EventManager::processEvent( const Event* event ) {
+        auto entry = _entries.find( event->Type );
+        for( auto handler : *( ( *entry ).second ) ) {
+            handler->OnEvent( event );
+        }
     }
 }

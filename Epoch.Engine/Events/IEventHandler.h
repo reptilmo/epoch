@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Event.h"
-
 namespace Epoch {
+
+    struct Event;
 
     /**
      * Represents an object which can process events.
@@ -15,6 +15,6 @@ namespace Epoch {
          * 
          * @param event The event to be processed.
          */
-        virtual void OnEvent( const Event& event ) = 0;
+        virtual void OnEvent( const Event* event ) = 0;
     };
 }
