@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Types.h"
+#include "../MeshData.h"
 
 namespace Epoch {
 
@@ -42,5 +43,12 @@ namespace Epoch {
          * @returns True on success, false on failure. Returning false crashes the application.
          */
         virtual const bool Frame( const F32 deltaTime ) = 0;
+
+
+        virtual const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) = 0;
+
+        virtual void FreeMeshData( const U64 index ) = 0;
+
+        virtual void AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) = 0;
     };
 }

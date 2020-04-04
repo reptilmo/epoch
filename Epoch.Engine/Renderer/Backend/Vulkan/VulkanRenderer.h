@@ -9,6 +9,8 @@
 
 namespace Epoch {
 
+    struct MeshUploadData;
+
     class ITexture;
 
     class Platform;    
@@ -59,7 +61,13 @@ namespace Epoch {
          */
         const bool Frame( const F32 deltaTime ) override;
 
-        void OnEvent( const Event& event ) override;
+        const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) override;
+
+        void FreeMeshData( const U64 index ) override;
+
+        void AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) override;
+
+        void OnEvent( const Event* event ) override;
 
         ITexture* GetTexture( const char* path );
 
@@ -131,5 +139,7 @@ namespace Epoch {
         U64 _currentTextureIndex = 0;
         VulkanTexture* _textures[2];
         VulkanTextureSampler* _textureSamplers[2];
+
+        std::vector<const MeshRendererReferenceData*> _currentRenderList;
     };
 }

@@ -3,6 +3,7 @@
 
 #include "Logger.h"
 #include "Platform/Platform.h"
+#include "Events/EventManager.h"
 
 #include "Engine.h"
 
@@ -11,14 +12,10 @@ namespace Epoch {
     Engine::Engine( const char* applicationName ) {
         Epoch::Logger::Log( "Initializing Epoch Engine: %d", 4 );
         _platform = new Platform( this, applicationName );
-        _renderer = new RendererFrontEnd( this );
     }
 
     Engine::~Engine() {
-        if( _renderer ) {
-            delete _renderer;
-            _renderer = nullptr;
-        }
+        RendererFrontEnd::Shutdown();
 
         if( _platform ) {
             delete _platform;
@@ -27,7 +24,7 @@ namespace Epoch {
     }
 
     void Engine::Run() {
-        if( !_renderer->Initialize() ) {
+        if( !RendererFrontEnd::Initialize( this ) ) {
             Logger::Fatal( "Failed to initialize renderer!" );
         }
 
@@ -36,9 +33,14 @@ namespace Epoch {
         }
     }
 
-    void Engine::OnLoop( const F32 deltaTime ) {
-        if( _renderer ) {
-            _renderer->Frame( deltaTime );
+    const bool Engine::OnLoop( const F32 deltaTime ) {
+        EventManager::Update( deltaTime );
+
+        if( !RendererFrontEnd::Frame( deltaTime ) ) {
+            Logger::Error( "Renderer failed! See logs for details." );
+            return false;
         }
+
+        return true;
     }
 }

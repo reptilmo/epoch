@@ -58,7 +58,9 @@ namespace Epoch {
         while( !glfwWindowShouldClose( _window ) ) {
             glfwPollEvents();
 
-            _engine->OnLoop( 0 );
+            if( !_engine->OnLoop( 0 ) ) {
+                Logger::Fatal( "Engine loop failed! See logs for details." );
+            }
         }
 
         WaitEvents();

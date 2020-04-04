@@ -1,15 +1,29 @@
 
 #include <unordered_map>
+#include <thread>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../../../External/tiny_obj_loader/tiny_obj_loader.h"
 
 #include "../../../Renderer/Vertex3D.h"
+#include "../../../Events/Event.h"
+
+#include "../../AssetLoadedEvent.h"
+
+#include "../StaticMeshAssetData.h"
+#include "../StaticMesh.h"
+
 #include "OBJLoader.h"
 
 namespace Epoch {
 
-    std::vector<StaticMesh> OBJLoader::LoadObjFile( const std::string& path ) {
+    void OBJLoader::LoadObjFile( const std::string& name, const std::string& path ) {
+
+        std::thread processThread( OBJLoader::loadOnThread, name, path );
+        processThread.detach();
+    }
+
+    void OBJLoader::loadOnThread( const std::string& name, const std::string& path ) {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
@@ -19,14 +33,14 @@ namespace Epoch {
             throw std::runtime_error( warn + err );
         }
 
-        std::vector<StaticMesh> meshes;
+        std::vector<StaticMeshData> meshes;
 
         std::unordered_map<Vertex3D, U32> uniqueVertices = {};
 
         U64 vertexArrayIndex = 0;
 
         for( const auto& shape : shapes ) {
-            StaticMesh mesh;
+            StaticMeshData mesh;
             mesh.Name = shape.name;
 
             for( const auto& index : shape.mesh.indices ) {
@@ -62,9 +76,19 @@ namespace Epoch {
 
                 vertexArrayIndex++;
             }
-            meshes.push_back( mesh );
+
+            // Only push back meshes with actual data in them.
+            if( mesh.Vertices.size() != 0 && mesh.Indices.size() != 0 ) {
+                meshes.push_back( mesh );
+            }
         }
 
-        return meshes;
+        // Execute the callback.
+        StaticMeshAssetData* assetData = new StaticMeshAssetData( path, name, meshes );
+
+        // Post the event, but *not* immediate. By waiting until the next frame, this thread no longer has
+        // a hold on the data.
+        AssetLoadedEvent* loadedEvent = new AssetLoadedEvent( assetData, nullptr );
+        loadedEvent->Post( false );
     }
 }

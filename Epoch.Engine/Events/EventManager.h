@@ -8,9 +8,14 @@ namespace Epoch {
 
     class EventManager {
     public:
-        void static Post( const Event event, const bool immediate );
-        void static Listen( const EventType type, IEventHandler* handler );
-        void static StopListening( const EventType type, IEventHandler* handler );
+        static void Post( const Event* event, const bool immediate );
+        static void Listen( const EventType type, IEventHandler* handler );
+        static void StopListening( const EventType type, IEventHandler* handler );
+
+        static void Update( const F32 deltaTime );
+
+    private:
+        static void processEvent( const Event* event );
 
     private:
         // Private to enforce singleton pattern.

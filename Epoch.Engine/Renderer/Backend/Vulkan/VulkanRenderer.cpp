@@ -17,10 +17,7 @@
 
 #include "../../StandardUniformBufferObject.h"
 #include "../../../Resources/ITexture.h"
-
-// TODO: temp
-#include "../../../Assets/StaticMesh/StaticMesh.h"
-#include "../../../Assets/StaticMesh/Loaders/OBJLoader.h"
+#include "../../MeshData.h"
 
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
@@ -81,10 +78,11 @@ namespace Epoch {
         _vertexShader = new VulkanShader( _device, "main", ShaderType::Vertex );
         _fragmentShader = new VulkanShader( _device, "main", ShaderType::Fragment );
 
-
+        // Create swapchain
         Extent2D extent = _platform->GetFramebufferExtent();
         _swapchain = new VulkanSwapchain( _device, _surface, _platform->GetWindow(), extent.Width, extent.Height );
 
+        // Create renderpass.
         createRenderPass();
         _swapchain->RegenerateFramebuffers();
 
@@ -148,8 +146,7 @@ namespace Epoch {
             _device->CommandPool->FreeCommandBuffer( _commandBuffers[i] );
         }
         _commandBuffers.clear();
-        //vkFreeCommandBuffers( _device->LogicalDevice, _device->CommandPool, _commandBuffers.size(), _commandBuffers.data() );
-        
+
         vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPool, nullptr );
 
         for( auto buffer : _uniformBuffers ) {
@@ -278,19 +275,20 @@ namespace Epoch {
         // Bind the buffer to the graphics pipeline
         _graphicsPipeline->Bind( _commandBuffers[_currentImageIndex] );
 
-        // TODO: These should be provided by the front end instead.
-        const LinkedListNode<VulkanBufferDataBlock>* vBlock = _vertexBuffer->PeekDataBlock();
-        const LinkedListNode<VulkanBufferDataBlock>* iBlock = _indexBuffer->PeekDataBlock();
+        // Draw everything in the render list.
+        U64 renderListCount = _currentRenderList.size();
+        for( U64 i = 0; i < renderListCount; ++i ) {
+            const MeshRendererReferenceData* ref = _currentRenderList[i];
+            const VulkanBufferDataBlock* vertexBlock = _vertexBuffer->GetDataRangeByIndex( ref->VertexHeapIndex );
+            const VulkanBufferDataBlock* indexBlock = _indexBuffer->GetDataRangeByIndex( ref->IndexHeapIndex );
 
-        //for( U64 i = 0; i < vertexBufferRanges.size(); ++i ) {
-        while( vBlock != nullptr ) {
             // Bind vertex buffers
             VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
-            VkDeviceSize offsets[] = { vBlock->Value.Offset }; // was 0
+            VkDeviceSize offsets[] = { vertexBlock->Offset }; // was 0
             vkCmdBindVertexBuffers( _commandBuffers[_currentImageIndex]->GetHandle(), 0, 1, vertexBuffers, offsets );
 
             // Bind index buffer
-            vkCmdBindIndexBuffer( _commandBuffers[_currentImageIndex]->GetHandle(), _indexBuffer->GetHandle(), iBlock->Value.Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
+            vkCmdBindIndexBuffer( _commandBuffers[_currentImageIndex]->GetHandle(), _indexBuffer->GetHandle(), indexBlock->Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
 
             // Bind descriptor sets (UBOs and samplers)
             vkCmdBindDescriptorSets( _commandBuffers[_currentImageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[_currentImageIndex], 0, nullptr );
@@ -298,10 +296,7 @@ namespace Epoch {
             // Make the draw call. TODO: use object properties
             //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
 
-            vkCmdDrawIndexed( _commandBuffers[_currentImageIndex]->GetHandle(), (U32)iBlock->Value.ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
-
-            vBlock = vBlock->Next;
-            iBlock = iBlock->Next;
+            vkCmdDrawIndexed( _commandBuffers[_currentImageIndex]->GetHandle(), (U32)indexBlock->ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
         }
 
         // End render pass.
@@ -340,11 +335,35 @@ namespace Epoch {
         // Give the image back to the swapchain.
         _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[swapchainFrameIndex], _currentImageIndex );
 
+        // Clear the render list for the next frame.
+        _currentRenderList.clear();
+
         return true;
     }
 
-    void VulkanRenderer::OnEvent( const Event& event ) {
-        switch( event.Type ) {
+    const bool VulkanRenderer::UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) {
+
+        _device->GraphicsQueue->WaitIdle();
+
+        VulkanBufferDataBlock* vertBlock = _vertexBuffer->AllocateData( data.Vertices );
+        VulkanBufferDataBlock* indexBlock = _indexBuffer->AllocateData( data.Indices );
+
+        referenceData->VertexHeapIndex = vertBlock->HeapIndex;
+        referenceData->IndexHeapIndex = indexBlock->HeapIndex;
+
+        return true;
+    }
+
+    void VulkanRenderer::FreeMeshData( const U64 index ) {
+
+    }
+
+    void VulkanRenderer::AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) {
+        _currentRenderList.push_back( referenceData );
+    }
+
+    void VulkanRenderer::OnEvent( const Event* event ) {
+        switch( event->Type ) {
         case EventType::WINDOW_RESIZED:
             //const WindowResizedEvent wre = (const WindowResizedEvent)event;
             _framebufferResizeOccurred = true;
@@ -639,7 +658,7 @@ namespace Epoch {
             delete _graphicsPipeline;
             _graphicsPipeline = nullptr;
         }
-        
+
 
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
@@ -684,42 +703,6 @@ namespace Epoch {
     }
 
     void VulkanRenderer::createBuffers() {
-        // Populate with data
-        //std::vector<Vertex3D> verts( 8 );
-        //verts[0] = { {-0.5f, -0.5f,  0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
-        //verts[1] = { { 0.5f, -0.5f,  0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
-        //verts[2] = { { 0.5f,  0.5f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
-        //verts[3] = { {-0.5f,  0.5f,  0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };
-        //verts[4] = { {-0.5f, -0.5f,  -1.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f} };
-        //verts[5] = { { 0.5f, -0.5f,  -1.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} };
-        //verts[6] = { { 0.5f,  0.5f,  1.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} };
-        //verts[7] = { {-0.5f,  0.5f,  -1.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} };
-
-        //std::vector<U32> indices = {
-        //    0, 1, 2, 2, 3, 0,
-        //    4, 5, 6, 6, 7, 4
-        //};
-
-        //// Vertex buffer.
-        //_vertexBuffer = new VulkanVertex3DBuffer( this );
-        //_vertexBuffer->SetData( verts );
-
-        //// Index buffer.
-        //_indexBuffer = new VulkanIndexBuffer( this );
-        //_indexBuffer->SetData( indices );
-
-        // Load from obj.
-        std::vector<StaticMesh> meshes = OBJLoader::LoadObjFile( "assets/models/sibenik.obj" );
-
-        // For now, just get the total size needed for the meshes.
-        U64 totalVertSize = 0;
-        U64 totalIndexSize = 0;
-        for( auto mesh : meshes ) {
-            totalVertSize += ( sizeof( Vertex3D ) * mesh.Vertices.size() );
-            totalIndexSize += ( sizeof( U32 ) * mesh.Indices.size() );
-        }
-        Logger::Log( "Mesh verts require %.2f MiB", ( (F32)totalVertSize / 1024.0f / 1024.0f ) );
-        Logger::Log( "Mesh indices require %.2f MiB", ( (F32)totalIndexSize / 1024.0f / 1024.0f ) );
 
         // Vertex buffer.
         _vertexBuffer = new VulkanVertex3DBuffer( _device );
@@ -730,17 +713,5 @@ namespace Epoch {
         _indexBuffer = new VulkanIndexBuffer( _device );
         // Allocate 32 MiB for the index buffer.
         _indexBuffer->Allocate( 32 * 1024 * 1024 );
-
-        U64 vertOffset = 0;
-        U64 indexOffset = 0;
-        for( auto mesh : meshes ) {
-            if( mesh.Vertices.size() == 0 || mesh.Indices.size() == 0 ) {
-                continue;
-            }
-            _vertexBuffer->SetDataRange( mesh.Vertices, vertOffset );
-            _indexBuffer->SetDataRange( mesh.Indices, indexOffset );
-            vertOffset += ( sizeof( Vertex3D ) * mesh.Vertices.size() );
-            indexOffset += ( sizeof( U32 ) * mesh.Indices.size() );
-        }
     }
 }

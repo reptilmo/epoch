@@ -4,6 +4,9 @@
 
 namespace Epoch {
 
+    struct MeshUploadData;
+    struct MeshRendererReferenceData;
+
     class Engine;
     class IRendererBackend;
 
@@ -18,23 +21,18 @@ namespace Epoch {
     public:
 
         /**
-         * Creates a new renderer front end. 
-         * 
-         * @param engine A pointer to the engine which owns this renderer.
-         */
-        RendererFrontEnd( Engine* engine );
-
-        /**
-         * Default destructor.
-         */
-        ~RendererFrontEnd();
-
-        /**
          * Initializes this renderer.
+         *         
+         * @param engine A pointer to the engine which owns this renderer.
          *
          * @returns True if successful; otherwise false.
          */
-        const bool Initialize();
+        static const bool Initialize( Engine* engine );
+
+        /**
+         * Shuts the rendering system down and releases all held resources.
+         */
+        static void Shutdown();
 
         /**
          * Processes a single frame.
@@ -43,14 +41,23 @@ namespace Epoch {
          *
          * @returns True on success, false on failure. Returning false crashes the application.
          */
-        const bool Frame( const F32 deltaTime );
+        static const bool Frame( const F32 deltaTime );
+
+        static const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData );
+
+        static void FreeMeshData( const U64 index );
+
+    private:
+        // Remove the ability to instantiate this class.
+        RendererFrontEnd() {}
+        ~RendererFrontEnd() {}
 
     private:
 
         // A pointer to the engine which owns this renderer.
-        Engine* _engine;
+        static Engine* _engine;
 
         // A pointer to the back end.
-        IRendererBackend* _backend;
+        static IRendererBackend* _backend;
     };
 }
