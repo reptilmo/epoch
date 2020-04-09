@@ -37,7 +37,7 @@ namespace Epoch {
         /**
          * Returns the shader used by this material.
          */
-        const IShader* GetShader() const { return _shader; }
+        IShader* GetShader() { return _shader; }
 
     protected:
         MaterialType _type;

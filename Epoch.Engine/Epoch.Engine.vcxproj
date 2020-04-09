@@ -223,7 +223,9 @@
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanUniformBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.h" />
     <ClInclude Include="Renderer\Frontend\RendererFrontend.h" />
+    <ClInclude Include="Renderer\ICommandBuffer.h" />
     <ClInclude Include="Renderer\IShader.h" />
+    <ClInclude Include="Renderer\IUniformBuffer.h" />
     <ClInclude Include="Renderer\Material.h" />
     <ClInclude Include="Renderer\MeshData.h" />
     <ClInclude Include="Renderer\RenderPassData.h" />

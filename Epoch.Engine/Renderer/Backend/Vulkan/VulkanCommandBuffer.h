@@ -3,6 +3,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include "../../ICommandBuffer.h"
 #include "../../../Defines.h"
 
 namespace Epoch {
@@ -21,7 +22,11 @@ namespace Epoch {
         NotAllocated
     };
 
-    class VulkanCommandBuffer {
+    /**
+     * Represents a Vulkan-specific implementation of a command buffer, which can have commands recorded to it and then be submitted to
+     * a queue for execution.
+     */
+    class VulkanCommandBuffer : public ICommandBuffer {
         friend class VulkanQueue;
     public:
 

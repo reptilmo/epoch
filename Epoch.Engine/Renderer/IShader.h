@@ -2,6 +2,10 @@
 
 namespace Epoch {
 
+    class ICommandBuffer;
+    class IUniformBuffer;
+    class BaseMaterial;
+
     enum ShaderType {
         Vertex,
         Fragment,
@@ -34,5 +38,23 @@ namespace Epoch {
          * Indicates if this shader has a compute stage.
          */
         virtual const bool HasComputeStage() const = 0;
+
+        /**
+         * Resets all descriptors in this shader. Typically done at the start of a frame before any binding is done.
+         *
+         * @param frameIndex The current index of the frame (or swapchain image) being drawn to.
+         */
+        virtual void ResetDescriptors( const U32 frameIndex ) = 0;
+
+        /**
+         * Updates the descriptors for the given frame and object indices.
+         * 
+         * @param commandBuffer The commandBuffer currently being recorded to.
+         * @param frameIndex The current index of the frame (or swapchain image) being drawn to.
+         * @param objectIndex The current list index of the object being rendered.
+         * @param uniformBuffer The uniform buffer to be bound.
+         * @param material A pointer to the material whose properties should be bound.
+         */
+        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) = 0;
     };
 }

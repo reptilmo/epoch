@@ -88,7 +88,7 @@ namespace Epoch {
         // Listen for resize events.
         Event::Listen( EventType::WINDOW_RESIZED, this );
 
-        
+
         // Create renderpass.
         createRenderPass();
         _swapchain->RegenerateFramebuffers();
@@ -264,11 +264,33 @@ namespace Epoch {
         clearInfo.Stencil = 0;
         _commandBuffers[_currentImageIndex]->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
 
+        U64 renderListCount = _currentRenderList.size();
+
         // Bind the buffer to the graphics pipeline
         //_graphicsPipeline->Bind( _commandBuffers[_currentImageIndex] );
+        // Get a flat list of all shaders.
 
-        // Draw everything in the render list.
-        U64 renderListCount = _currentRenderList.size();
+        std::vector<IShader*> frameShaders;
+        for( U64 i = 0; i < renderListCount; ++i ) {
+            bool added = false;
+            IShader* shader = _currentRenderList[i]->Material->GetShader();
+            for( auto fs : frameShaders ) {
+                if( fs == shader ) {
+                    added = true;
+                    break;
+                }
+            }
+            if( !added ) {
+                frameShaders.push_back( shader );
+            }
+        }
+
+        // Reset the shader descriptors
+        for( auto fs : frameShaders ) {
+            fs->ResetDescriptors( _currentImageIndex );
+        }
+
+        // Draw everything in the render list.        
         for( U64 i = 0; i < renderListCount; ++i ) {
             const MeshRendererReferenceData* ref = _currentRenderList[i];
             const VulkanBufferDataBlock* vertexBlock = _vertexBuffer->GetDataRangeByIndex( ref->VertexHeapIndex );
@@ -279,12 +301,11 @@ namespace Epoch {
             VulkanShader* shader = (VulkanShader*)material->GetShader();
 
             // Bind the buffer to the graphics pipeline
-            shader->Bind( _commandBuffers[_currentImageIndex] );
+            shader->Bind( _commandBuffers[_currentImageIndex], _currentImageIndex, i );
 
-            // TODO: use a different descriptor layout per material type.
-            ( (VulkanUnlitShader*)shader )->UpdateDescriptor( _commandBuffers[_currentImageIndex], _currentImageIndex, _uniformBuffers[_currentImageIndex], (VulkanImage*)material->DiffuseMap->GetImage() );
-            //updateDescriptorSet( _currentImageIndex, (VulkanImage*)material->DiffuseMap->GetImage(), _textureSamplers[_currentImageIndex] );
-
+            // Update the descriptor for this object.
+            shader->UpdateDescriptor( _commandBuffers[_currentImageIndex], _currentImageIndex, i, _uniformBuffers[_currentImageIndex], material );
+            
             // Bind vertex buffers
             VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
             VkDeviceSize offsets[] = { vertexBlock->Offset }; // was 0

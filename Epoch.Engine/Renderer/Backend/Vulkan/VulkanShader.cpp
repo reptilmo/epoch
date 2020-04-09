@@ -2,6 +2,9 @@
 #include "../../../String/StringUtilities.h"
 #include "../../../Platform/FileHelper.h"
 #include "../../../Events/Event.h"
+#include "../../Material.h"
+#include "../../../Resources/ITexture.h"
+
 #include "VulkanRenderPassManager.h"
 #include "VulkanUniformBuffer.h"
 #include "VulkanImage.h"
@@ -84,7 +87,7 @@ namespace Epoch {
             _computeModule = new VulkanShaderModule( device, name, ShaderType::Compute );
         }
 
-        
+
     }
 
     VulkanShader::~VulkanShader() {
@@ -108,10 +111,13 @@ namespace Epoch {
             _computeModule = nullptr;
         }
 
-        if( _descriptorPool ) {
-            vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPool, nullptr );
-            _descriptorPool = nullptr;
+        for( U32 i = 0; i < _imageCount; ++i ) {
+            if( _descriptorPools[i] ) {
+                vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPools[i], nullptr );
+                _descriptorPools[i] = nullptr;
+            }
         }
+        _descriptorPools.clear();
 
         for( U32 i = 0; i < _imageCount; ++i ) {
             delete _textureSamplers[0];
@@ -137,16 +143,36 @@ namespace Epoch {
         }
     }
 
-    void VulkanShader::Bind( VulkanCommandBuffer* commandBuffer ) {
+    void VulkanShader::ResetDescriptors( const U32 frameIndex ) {
+        VK_CHECK( vkResetDescriptorPool( _device->LogicalDevice, _descriptorPools[frameIndex], 0 ) );
+    }
+
+    void VulkanShader::Bind( VulkanCommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex ) {
         _graphicsPipeline->Bind( commandBuffer );
 
         // Note: might need to be a separate step
+
+        // Fill an array with pointers to the descriptor set layout.
+        std::vector<VkDescriptorSetLayout> layouts( _imageCount, _descriptorSetLayout );
+
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = _descriptorPools[frameIndex];
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &_descriptorSetLayout;
+
+        //_descriptorSets.resize( _imageCount );
+        VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, &_descriptorSets[frameIndex][objectIndex] ) );
+    }
+
+    void VulkanShader::UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) {
+
     }
 
     void VulkanShader::intialize() {
         createDescriptorSetLayout();
-        createDescriptorPool();
-        createDescriptorSets();
+        createDescriptorPools();
+        //createDescriptorSets();
         createTextureSamplers();
         createPipeline( _device->FramebufferSize );
 
@@ -173,25 +199,27 @@ namespace Epoch {
         VulkanShader::~VulkanShader();
     }
 
-    void VulkanUnlitShader::UpdateDescriptor( VulkanCommandBuffer* commandBuffer, U32 descriptorIndex, VulkanUniformBuffer* ubo, VulkanImage* diffuseImage ) {
+    void VulkanUnlitShader::UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) {
 
         // Configure the descriptors for the given index..
         VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = ubo->GetHandle();
+        bufferInfo.buffer = static_cast<VulkanUniformBuffer*>( uniformBuffer )->GetHandle();
         bufferInfo.offset = 0;
 
         bufferInfo.range = sizeof( StandardUniformBufferObject );
 
+        UnlitMaterial* castMaterial = static_cast<UnlitMaterial*>( material );
+        VulkanImage* diffuseImage = static_cast<VulkanImage*>( castMaterial->DiffuseMap->GetImage() );
         VkDescriptorImageInfo imageInfo = {};
         if( diffuseImage != nullptr ) {
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = diffuseImage->GetView();
-            imageInfo.sampler = _textureSamplers[descriptorIndex]->GetHandle();
+            imageInfo.sampler = _textureSamplers[frameIndex]->GetHandle();
         }
 
         std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = _descriptorSets[descriptorIndex];
+        descriptorWrites[0].dstSet = _descriptorSets[frameIndex][objectIndex];
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].pNext = nullptr;
@@ -201,7 +229,7 @@ namespace Epoch {
 
         // Diffuse sampler.
         descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = _descriptorSets[descriptorIndex];
+        descriptorWrites[1].dstSet = _descriptorSets[frameIndex][objectIndex];
         descriptorWrites[1].dstBinding = 1;
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].pNext = nullptr;
@@ -216,7 +244,7 @@ namespace Epoch {
         vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
 
         // NOTE: might have to happen in a separate step
-        vkCmdBindDescriptorSets( commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[descriptorIndex], 0, nullptr );
+        vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[frameIndex][objectIndex], 0, nullptr );
     }
 
     void VulkanUnlitShader::createDescriptorSetLayout() {
@@ -250,36 +278,43 @@ namespace Epoch {
         VK_CHECK( vkCreateDescriptorSetLayout( _device->LogicalDevice, &layoutInfo, nullptr, &_descriptorSetLayout ) );
     }
 
-    void VulkanUnlitShader::createDescriptorPool() {
-        VkDescriptorPoolSize poolSizes[2];
+    void VulkanUnlitShader::createDescriptorPools() {
+        const U32 poolSizeCount = 2;
+        VkDescriptorPoolSize poolSizes[poolSizeCount];
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = _imageCount;
+        poolSizes[0].descriptorCount = VULKAN_MAX_UNIFORM_BUFFERS;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = _imageCount;
+        poolSizes[1].descriptorCount = VULKAN_MAX_IMAGE_SAMPLERS;
 
         VkDescriptorPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 2;
+        poolInfo.poolSizeCount = poolSizeCount;
         poolInfo.pPoolSizes = poolSizes;
-        poolInfo.maxSets = _imageCount;
+        poolInfo.maxSets = VULKAN_MAX_DESC_SETS;
 
-        VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &poolInfo, nullptr, &_descriptorPool ) );
-    }
-
-    void VulkanUnlitShader::createDescriptorSets() {
-
-        // Fill an array with pointers to the descriptor set layout.
-        std::vector<VkDescriptorSetLayout> layouts( _imageCount, _descriptorSetLayout );
-
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = _descriptorPool;
-        allocInfo.descriptorSetCount = _imageCount;
-        allocInfo.pSetLayouts = layouts.data();
-
+        // Create a pool per frame (double/triple).
+        _descriptorPools.resize( _imageCount );
         _descriptorSets.resize( _imageCount );
-        VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, _descriptorSets.data() ) );
+        for( U32 i = 0; i < _imageCount; ++i ) {
+            _descriptorSets[i].resize( VULKAN_MAX_DESC_SETS );
+            VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &poolInfo, nullptr, &_descriptorPools[i] ) );
+        }
     }
+
+    //void VulkanUnlitShader::createDescriptorSets() {
+
+    //    // Fill an array with pointers to the descriptor set layout.
+    //    std::vector<VkDescriptorSetLayout> layouts( _imageCount, _descriptorSetLayout );
+
+    //    VkDescriptorSetAllocateInfo allocInfo = {};
+    //    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    //    allocInfo.descriptorPool = _descriptorPool;
+    //    allocInfo.descriptorSetCount = _imageCount;
+    //    allocInfo.pSetLayouts = layouts.data();
+
+    //    _descriptorSets.resize( _imageCount );
+    //    VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, _descriptorSets.data() ) );
+    //}
 
     void VulkanUnlitShader::createTextureSamplers() {
         for( U32 i = 0; i < _imageCount; ++i ) {

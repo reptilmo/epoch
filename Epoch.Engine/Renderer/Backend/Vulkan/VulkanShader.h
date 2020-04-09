@@ -8,13 +8,18 @@
 
 #define BUILTIN_SHADER_NAME_UNLIT "Builtin.UnlitShader"
 
+#define VULKAN_MAX_DESC_SETS 16384
+#define VULKAN_MAX_IMAGE_SAMPLERS 12384
+#define VULKAN_MAX_UNIFORM_BUFFERS 8192
+
 namespace Epoch {
 
     struct Extent2D;
     class VulkanDevice;
     class VulkanImage;
     class VulkanTextureSampler;
-    class VulkanUniformBuffer;
+    class ICommandBuffer;
+    class IUniformBuffer;
     class VulkanGraphicsPipeline;
 
     class VulkanShaderModule {
@@ -31,6 +36,9 @@ namespace Epoch {
         VkPipelineShaderStageCreateInfo _shaderStageCreateInfo;
     };
 
+    /*
+     Represents a Vulkan shader, complete with the appropriate stage modules.
+    */
     class VulkanShader : public IShader, public IEventHandler {
     public:
         VulkanShader( VulkanDevice* device, const char* name, const U32 imageCount, const TString& renderPassName, const bool hasVertex, const bool hasFragment, const bool hasGeometry, const bool hasCompute );
@@ -38,7 +46,9 @@ namespace Epoch {
 
         void OnEvent( const Event* event ) override;
 
-        void Bind( VulkanCommandBuffer* commandBuffer );
+        void ResetDescriptors( const U32 frameIndex );
+        void Bind( VulkanCommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex );
+        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material );
 
         const bool HasVertexStage() const override { return _vertexModule != nullptr; }
         const bool HasFragmentStage() const override { return _fragmentModule != nullptr; }
@@ -50,8 +60,6 @@ namespace Epoch {
         VulkanShaderModule* GetGeometryStage() { return _geometryModule; }
         VulkanShaderModule* GetComputeStage() { return _computeModule; }
 
-        const VkDescriptorSet GetDescriptorSet( const U64 index ) const { return _descriptorSets[index]; }
-
         const VulkanGraphicsPipeline* GetPipeline() const { return _graphicsPipeline; }
 
     protected:
@@ -59,18 +67,18 @@ namespace Epoch {
         virtual void destroyPipeline();
 
         virtual void createDescriptorSetLayout() = 0;
-        virtual void createDescriptorPool() = 0;
-        virtual void createDescriptorSets() = 0;
+        virtual void createDescriptorPools() = 0;
         virtual void createTextureSamplers() = 0;
         virtual void createPipeline( const Extent2D& extent ) = 0;
 
 
     protected:
+        bool _needsReset = true;
         TString _renderPassName;
 
-        VkDescriptorPool _descriptorPool;
+        std::vector<VkDescriptorPool> _descriptorPools;
         VkDescriptorSetLayout _descriptorSetLayout;
-        std::vector<VkDescriptorSet> _descriptorSets;
+        std::vector<std::vector<VkDescriptorSet>> _descriptorSets;
         std::vector<VulkanTextureSampler*> _textureSamplers;
 
         VulkanGraphicsPipeline* _graphicsPipeline;
@@ -91,12 +99,10 @@ namespace Epoch {
         VulkanUnlitShader( VulkanDevice* device, const U32 imageCount, const TString& renderPassName );
         ~VulkanUnlitShader();
 
-        // TODO: This should be made more generic.
-        void UpdateDescriptor( VulkanCommandBuffer* commandBuffer, U32 descriptorIndex, VulkanUniformBuffer* ubo, VulkanImage* diffuseImage );
+        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material );
     protected:
         virtual void createDescriptorSetLayout() override;
-        virtual void createDescriptorPool() override;
-        virtual void createDescriptorSets() override;
+        virtual void createDescriptorPools() override;
         virtual void createTextureSamplers() override;
         virtual void createPipeline( const Extent2D& extent ) override;
     };
