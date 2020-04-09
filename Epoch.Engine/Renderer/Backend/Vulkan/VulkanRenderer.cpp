@@ -14,10 +14,13 @@
 #include "../../../Math/Matrix4x4.h"
 #include "../../../Math/Vector3.h"
 #include "../../../Math/Quaternion.h"
+#include "../../../String/TString.h"
 
 #include "../../StandardUniformBufferObject.h"
 #include "../../../Resources/ITexture.h"
 #include "../../MeshData.h"
+#include "../../Material.h"
+#include "../../IShader.h"
 
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
@@ -47,6 +50,7 @@ namespace Epoch {
     VulkanRenderer::VulkanRenderer( Platform* platform ) {
         _platform = platform;
         Logger::Trace( "Creating Vulkan renderer..." );
+
     }
 
     VulkanRenderer::~VulkanRenderer() {
@@ -75,31 +79,30 @@ namespace Epoch {
         _device->FramebufferSize = _platform->GetFramebufferExtent();
 
         // Shader creation.
-        _vertexShader = new VulkanShader( _device, "main", ShaderType::Vertex );
-        _fragmentShader = new VulkanShader( _device, "main", ShaderType::Fragment );
+        //_unlitShader = new VulkanUnlitShader( _device, "main", true, true, false, false );
 
         // Create swapchain
         Extent2D extent = _platform->GetFramebufferExtent();
         _swapchain = new VulkanSwapchain( _device, _surface, _platform->GetWindow(), extent.Width, extent.Height );
 
+        // Listen for resize events.
+        Event::Listen( EventType::WINDOW_RESIZED, this );
+
+        
         // Create renderpass.
         createRenderPass();
         _swapchain->RegenerateFramebuffers();
 
-        createDescriptorSetLayout();
+        // Built-in shader creation.
+        _unlitShader = new VulkanUnlitShader( _device, _swapchain->GetSwapchainImageCount(), "RenderPass.Default" );
 
-        createGraphicsPipeline();
+        //createDescriptorSetLayout();
 
+        //createGraphicsPipeline();
 
-        // Asset loading here for now
-
-        // Load texture image/views
-        _textures[0] = (VulkanTexture*)GetTexture( "assets/textures/test512.png" );
-        _textures[1] = (VulkanTexture*)GetTexture( "assets/textures/testice.jpg" );
-
-        // Create samplers - one per in-flight frame
-        _textureSamplers[0] = new VulkanTextureSampler( _device );
-        _textureSamplers[1] = new VulkanTextureSampler( _device );
+        //// Create samplers - one per in-flight frame. TODO: should probably be held by the shader.
+        //_textureSamplers[0] = new VulkanTextureSampler( _device );
+        //_textureSamplers[1] = new VulkanTextureSampler( _device );
 
         // TODO: load model
         createBuffers();
@@ -108,18 +111,17 @@ namespace Epoch {
 
         // Create UBOs
         createUniformBuffers();
-        createDescriptorPool();
-        createDescriptorSets();
+        //createDescriptorPool();
+        //createDescriptorSets();
         U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
+            //updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
         }
 
         createCommandBuffers();
         createSyncObjects();
 
-        // Listen for resize events.
-        Event::Listen( EventType::WINDOW_RESIZED, this );
+
 
         return true;
     }
@@ -147,7 +149,7 @@ namespace Epoch {
         }
         _commandBuffers.clear();
 
-        vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPool, nullptr );
+        //vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPool, nullptr );
 
         for( auto buffer : _uniformBuffers ) {
             delete buffer;
@@ -165,7 +167,7 @@ namespace Epoch {
         }
 
         // TEMP
-        if( _textureSamplers[0] ) {
+        /*if( _textureSamplers[0] ) {
             delete _textureSamplers[0];
             _textureSamplers[0] = nullptr;
         }
@@ -173,24 +175,24 @@ namespace Epoch {
         if( _textureSamplers[1] ) {
             delete _textureSamplers[1];
             _textureSamplers[1] = nullptr;
-        }
+        }*/
 
-        if( _textures[0] ) {
+        /*if( _textures[0] ) {
             delete _textures[0];
             _textures[0] = nullptr;
-        }
+        }*/
 
-        if( _textures[1] ) {
+        /*if( _textures[1] ) {
             delete _textures[1];
             _textures[1] = nullptr;
-        }
+        }*/
 
-        if( _graphicsPipeline ) {
+        /*if( _graphicsPipeline ) {
             delete _graphicsPipeline;
             _graphicsPipeline = nullptr;
-        }
+        }*/
 
-        vkDestroyDescriptorSetLayout( _device->LogicalDevice, _descriptorSetLayout, nullptr );
+        //         vkDestroyDescriptorSetLayout( _device->LogicalDevice, _descriptorSetLayout, nullptr );
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
         if( _swapchain ) {
@@ -198,14 +200,9 @@ namespace Epoch {
             _swapchain = nullptr;
         }
 
-        if( _vertexShader ) {
-            delete _vertexShader;
-            _vertexShader = nullptr;
-        }
-
-        if( _fragmentShader ) {
-            delete _fragmentShader;
-            _fragmentShader = nullptr;
+        if( _unlitShader ) {
+            delete _unlitShader;
+            _unlitShader = nullptr;
         }
 
         vkDestroySurfaceKHR( _instance, _surface, nullptr );
@@ -249,16 +246,11 @@ namespace Epoch {
             return false;
         }
 
-        // Update descriptors if need be. TEST: Swap texture
-        // Must happen before queue is started below.
-        _updatesTemp++;
-        if( _updatesTemp > 3000 ) {
-            _currentTextureIndex = ( _currentTextureIndex == 0 ? 1 : 0 );
-            _updatesTemp = 0;
-        }
 
-        // Update the current descriptor set.
-        updateDescriptorSet( _currentImageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
+
+        //// Update the current descriptor set.
+        //BaseMaterial* material = _currentRenderList[0]->Material;
+        //updateDescriptorSet( _currentImageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
 
         // Begin recording.
         _commandBuffers[_currentImageIndex]->Begin();
@@ -273,7 +265,7 @@ namespace Epoch {
         _commandBuffers[_currentImageIndex]->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
 
         // Bind the buffer to the graphics pipeline
-        _graphicsPipeline->Bind( _commandBuffers[_currentImageIndex] );
+        //_graphicsPipeline->Bind( _commandBuffers[_currentImageIndex] );
 
         // Draw everything in the render list.
         U64 renderListCount = _currentRenderList.size();
@@ -281,6 +273,17 @@ namespace Epoch {
             const MeshRendererReferenceData* ref = _currentRenderList[i];
             const VulkanBufferDataBlock* vertexBlock = _vertexBuffer->GetDataRangeByIndex( ref->VertexHeapIndex );
             const VulkanBufferDataBlock* indexBlock = _indexBuffer->GetDataRangeByIndex( ref->IndexHeapIndex );
+
+            // Update the current descriptor set.
+            UnlitMaterial* material = (UnlitMaterial*)ref->Material;
+            VulkanShader* shader = (VulkanShader*)material->GetShader();
+
+            // Bind the buffer to the graphics pipeline
+            shader->Bind( _commandBuffers[_currentImageIndex] );
+
+            // TODO: use a different descriptor layout per material type.
+            ( (VulkanUnlitShader*)shader )->UpdateDescriptor( _commandBuffers[_currentImageIndex], _currentImageIndex, _uniformBuffers[_currentImageIndex], (VulkanImage*)material->DiffuseMap->GetImage() );
+            //updateDescriptorSet( _currentImageIndex, (VulkanImage*)material->DiffuseMap->GetImage(), _textureSamplers[_currentImageIndex] );
 
             // Bind vertex buffers
             VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
@@ -291,7 +294,7 @@ namespace Epoch {
             vkCmdBindIndexBuffer( _commandBuffers[_currentImageIndex]->GetHandle(), _indexBuffer->GetHandle(), indexBlock->Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
 
             // Bind descriptor sets (UBOs and samplers)
-            vkCmdBindDescriptorSets( _commandBuffers[_currentImageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[_currentImageIndex], 0, nullptr );
+            //vkCmdBindDescriptorSets( _commandBuffers[_currentImageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[_currentImageIndex], 0, nullptr );
 
             // Make the draw call. TODO: use object properties
             //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
@@ -376,13 +379,20 @@ namespace Epoch {
         }
     }
 
-    ITexture* VulkanRenderer::GetTexture( const char* path ) {
-        // TODO: Should probably get by name somehow.
-        return new VulkanTexture( _device, path, path );
+    ITexture* VulkanRenderer::GetTexture( const TString& name, const TString& path ) {
+        return new VulkanTexture( _device, name, path );
     }
 
     Extent2D VulkanRenderer::GetFramebufferExtent() {
         return _platform->GetFramebufferExtent();
+    }
+
+    IShader* VulkanRenderer::GetBuiltinMaterialShader( const MaterialType type ) {
+        switch( type ) {
+        default:
+        case MaterialType::Unlit:
+            return static_cast<IShader*>( _unlitShader );
+        }
     }
 
     void VulkanRenderer::createInstance() {
@@ -472,16 +482,29 @@ namespace Epoch {
         VulkanRenderPassManager::CreateRenderPass( _device, renderPassData );
     }
 
-    void VulkanRenderer::createGraphicsPipeline() {
+    /*void VulkanRenderer::createGraphicsPipeline() {
         PipelineInfo info;
         info.Extent = _swapchain->Extent;
         info.Renderpass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
         info.DescriptorSetLayouts.push_back( _descriptorSetLayout );
-        info.ShaderStages.push_back( _vertexShader->GetShaderStageCreateInfo() );
-        info.ShaderStages.push_back( _fragmentShader->GetShaderStageCreateInfo() );
+        if( _unlitShader->HasVertexStage() ) {
+            info.ShaderStages.push_back( _unlitShader->GetVertexStage()->GetShaderStageCreateInfo() );
+        }
+
+        if( _unlitShader->HasFragmentStage() ) {
+            info.ShaderStages.push_back( _unlitShader->GetFragmentStage()->GetShaderStageCreateInfo() );
+        }
+
+        if( _unlitShader->HasGeometryStage() ) {
+            info.ShaderStages.push_back( _unlitShader->GetGeometryStage()->GetShaderStageCreateInfo() );
+        }
+
+        if( _unlitShader->HasComputeStage() ) {
+            info.ShaderStages.push_back( _unlitShader->GetComputeStage()->GetShaderStageCreateInfo() );
+        }
 
         _graphicsPipeline = new VulkanGraphicsPipeline( _device, info );
-    }
+    }*/
 
     void VulkanRenderer::createUniformBuffers() {
         VkDeviceSize bufferSize = sizeof( StandardUniformBufferObject );
@@ -518,7 +541,7 @@ namespace Epoch {
         TMemory::Memcpy( data, &ubo, sizeof( ubo ) );
         _uniformBuffers[currentImageIndex]->GetInternal()->UnlockMemory();
     }
-
+    /*
     void VulkanRenderer::createDescriptorSetLayout() {
         VkDescriptorSetLayoutBinding uboLayoutBinding = {};
         uboLayoutBinding.binding = 0;
@@ -584,12 +607,15 @@ namespace Epoch {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = _uniformBuffers[descriptorSetIndex]->GetHandle();
         bufferInfo.offset = 0;
+
         bufferInfo.range = sizeof( StandardUniformBufferObject );
 
         VkDescriptorImageInfo imageInfo = {};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = textureImage->GetView();
-        imageInfo.sampler = sampler->GetHandle();
+        if( textureImage != nullptr ) {
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = textureImage->GetView();
+            imageInfo.sampler = sampler->GetHandle();
+        }
 
         std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -608,10 +634,14 @@ namespace Epoch {
         descriptorWrites[1].pNext = nullptr;
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
+        if( textureImage != nullptr ) {
+            descriptorWrites[1].pImageInfo = &imageInfo;
+        } else {
+            descriptorWrites[1].pImageInfo = nullptr;
+        }
 
         vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
-    }
+    }*/
 
     void VulkanRenderer::createCommandBuffers() {
         U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
@@ -654,10 +684,10 @@ namespace Epoch {
         }
         _commandBuffers.clear();
 
-        if( _graphicsPipeline ) {
+        /*if( _graphicsPipeline ) {
             delete _graphicsPipeline;
             _graphicsPipeline = nullptr;
-        }
+        }*/
 
 
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
@@ -688,15 +718,15 @@ namespace Epoch {
         cleanupSwapchain();
 
         createRenderPass();
-        createGraphicsPipeline();
+        //createGraphicsPipeline();
         _swapchain->RegenerateFramebuffers();
         createUniformBuffers();
-        createDescriptorPool();
-        createDescriptorSets();
-        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
+        //createDescriptorPool();
+       // createDescriptorSets();
+        /*U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U64 i = 0; i < swapchainImageCount; ++i ) {
             updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
-        }
+        }*/
         createCommandBuffers();
 
         _recreatingSwapchain = false;

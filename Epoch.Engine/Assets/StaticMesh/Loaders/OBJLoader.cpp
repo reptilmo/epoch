@@ -7,6 +7,7 @@
 
 #include "../../../Renderer/Vertex3D.h"
 #include "../../../Events/Event.h"
+#include "../../../Renderer/Material.h"
 
 #include "../../AssetLoadedEvent.h"
 
@@ -42,6 +43,17 @@ namespace Epoch {
         for( const auto& shape : shapes ) {
             StaticMeshData mesh;
             mesh.Name = shape.name;
+
+            // Parse material info. This engine will not support per-face materials. 
+            // Therefore, just use the material id from then first face. 
+            if( !shape.mesh.material_ids.empty() ) {
+                I64 materialId = shape.mesh.material_ids[0];
+                tinyobj::material_t rawMat = materials[materialId];
+                mesh.MaterialInfo.Name = rawMat.name.c_str();
+                mesh.MaterialInfo.DiffuseMapName = rawMat.diffuse_texname.c_str();
+            } else {
+                // If there are no materials, assign the default one.
+            }
 
             for( const auto& index : shape.mesh.indices ) {
                 Vertex3D vertex = {};

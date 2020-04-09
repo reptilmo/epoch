@@ -4,11 +4,16 @@
 
 namespace Epoch {
 
+    enum class MaterialType;
     struct MeshUploadData;
     struct MeshRendererReferenceData;
 
     class Engine;
+    class TString;
     class IRendererBackend;
+    class TextureCache;
+    class ITexture;
+    class IShader;
 
     /*
      The renderer "front-end", which represents the interaction point with the rest of the engine.
@@ -47,6 +52,21 @@ namespace Epoch {
 
         static void FreeMeshData( const U64 index );
 
+        /**
+         * Obtains a texture reference to the provided name. Path, for now, is required.
+         * TODO: Use discovery/manifest so the path isn't required here.
+         */
+        static ITexture* GetTexture( const TString& name, const TString& path, const bool bypassCache = false );
+
+        static ITexture* GetDefaultWhiteTexture();
+
+        /**
+         * Releases a reference to the texture with the given name. If no references remain, the texture is unloaded.
+         */
+        static void ReleaseTexture( const TString& name );
+
+        static IShader* GetBuiltinMaterialShader( const MaterialType type );
+
     private:
         // Remove the ability to instantiate this class.
         RendererFrontEnd() {}
@@ -59,5 +79,7 @@ namespace Epoch {
 
         // A pointer to the back end.
         static IRendererBackend* _backend;
+
+        static TextureCache* _textureCache;
     };
 }

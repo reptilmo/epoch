@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "../../Types.h"
-
+#include "../../String/TString.h"
 #include "../../Events/IEventHandler.h"
 
 #include "../../Renderer/Vertex3D.h"
@@ -11,16 +11,21 @@
 
 namespace Epoch {
 
+    class BaseMaterial;
 
+    struct MaterialInfo {
+        TString Name;
+        TString DiffuseMapName;
+    };
 
     struct StaticMeshData {
         std::string Name;
         std::vector<Epoch::Vertex3D> Vertices;
         std::vector<U32> Indices;
 
-        // TODO: Material info
-
         MeshRendererReferenceData RendererReferenceData;
+
+        MaterialInfo MaterialInfo;
     };
 
     class StaticMesh : public IEventHandler {

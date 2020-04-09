@@ -12,6 +12,8 @@ namespace Epoch {
     struct MeshUploadData;
 
     class ITexture;
+    class TString;
+    class IUnlitShader;
 
     class Platform;    
     class VulkanVertex3DBuffer;
@@ -69,21 +71,23 @@ namespace Epoch {
 
         void OnEvent( const Event* event ) override;
 
-        ITexture* GetTexture( const char* path );
+        ITexture* GetTexture( const TString& name, const TString& path ) override;
 
         Extent2D GetFramebufferExtent();
+
+        IShader* GetBuiltinMaterialShader( const MaterialType type );
 
     private:
         void createInstance();
         void createRenderPass();
-        void createGraphicsPipeline();
+        //void createGraphicsPipeline();
         
         void createUniformBuffers();
         void updateUniformBuffers( U32 currentImageIndex );
-        void createDescriptorSetLayout();
+        /*void createDescriptorSetLayout();
         void createDescriptorPool();
-        void createDescriptorSets();
-        void updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VulkanTextureSampler* sampler );
+        void createDescriptorSets();*/
+        //void updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VulkanTextureSampler* sampler );
         void createCommandBuffers();
         void createSyncObjects();
         void cleanupSwapchain();
@@ -104,13 +108,8 @@ namespace Epoch {
 
         VkSurfaceKHR _surface;
 
-        VulkanShader* _vertexShader;
-        VulkanShader* _fragmentShader;
+        IShader* _unlitShader;
 
-        // Descriptor pools/sets
-        VkDescriptorPool _descriptorPool;
-        VkDescriptorSetLayout _descriptorSetLayout;
-        std::vector<VkDescriptorSet> _descriptorSets;
 
         VulkanSwapchain* _swapchain;
         bool _recreatingSwapchain = false;
@@ -119,7 +118,7 @@ namespace Epoch {
         // Command buffers
         std::vector<VulkanCommandBuffer*> _commandBuffers;
 
-        VulkanGraphicsPipeline* _graphicsPipeline;
+        
 
         // Sync objects
         std::vector<VulkanSemaphore*> _imageAvailableSemaphores;
@@ -133,12 +132,6 @@ namespace Epoch {
         // Asset load temp
         VulkanVertex3DBuffer* _vertexBuffer;
         VulkanIndexBuffer* _indexBuffer;
-
-        // textures
-        U64 _updatesTemp = 0;
-        U64 _currentTextureIndex = 0;
-        VulkanTexture* _textures[2];
-        VulkanTextureSampler* _textureSamplers[2];
 
         std::vector<const MeshRendererReferenceData*> _currentRenderList;
     };

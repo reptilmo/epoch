@@ -3,6 +3,7 @@
 #include "../../Logger.h"
 
 #include "../../Renderer/Frontend/RendererFrontend.h"
+#include "../../Renderer/Material.h"
 #include "StaticMeshAssetData.h"
 #include "Loaders/OBJLoader.h"
 #include "StaticMesh.h"
@@ -69,10 +70,28 @@ namespace Epoch {
                 Logger::Error( "Error uploading mesh. See logs for details." );
                 return false;
             }
+
+            // Load/assign materials.
+            if( MaterialManager::Exists( mesh.MaterialInfo.Name ) ) {
+                mesh.RendererReferenceData.Material = MaterialManager::Get( mesh.MaterialInfo.Name );
+            } else {
+
+                // TODO: check for other map types than diffuse. If they exist, use a lit material.
+                // For now defaulting to an unlit material.
+                TString diffuseTexName = mesh.MaterialInfo.DiffuseMapName;
+                if( !diffuseTexName.IsEmpty() ) {
+                    TString diffusePath = "assets/textures/";
+                    diffusePath.Append( diffuseTexName );
+                    mesh.RendererReferenceData.Material = MaterialManager::CreateUnlit( mesh.MaterialInfo.Name, diffusePath );
+                } else {
+                    mesh.RendererReferenceData.Material = MaterialManager::CreateUnlit( mesh.MaterialInfo.Name, "" );
+                }
+            }
         }
 
         _isUploaded = true;
         Logger::Trace( "Done." );
+        return true;
     }
 
     void StaticMesh::onDataLoaded( std::vector<StaticMeshData> data ) {
