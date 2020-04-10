@@ -10,17 +10,32 @@
 
 namespace Epoch {
 
-    StaticMesh* StaticMesh::FromFile( const std::string name, const std::string filePath, const bool autoUploadToGPU ) {
+    StaticMesh* StaticMesh::FromFile( const TString& name, const TString& filePath, const bool autoUploadToGPU ) {
 
-        StaticMesh* mesh = new StaticMesh();
-        mesh->_name = name;
-        mesh->_path = filePath;
-        mesh->_autoUpload = autoUploadToGPU;
+        StaticMesh* mesh = new StaticMesh( name, filePath, autoUploadToGPU );
 
         // This is asynchronous and does not return a result here.
         mesh->loadMeshDataFromFile( name, filePath );
 
         return mesh;
+    }
+
+    StaticMesh::StaticMesh() {
+        _name = "";
+        _path = "";
+        _autoUpload = false;
+    }
+
+    StaticMesh::StaticMesh( const TString& name, const TString& filePath, const bool autoUploadToGPU ) {
+        _name = name;
+        _path = filePath;
+        _autoUpload = autoUploadToGPU;
+    }
+
+    StaticMesh::~StaticMesh() {
+        _name.Clear();
+        _path.Clear();
+        _meshes.clear();
     }
 
     void StaticMesh::OnEvent( const Event* event ) {
@@ -37,8 +52,9 @@ namespace Epoch {
         }
     }
 
-    const bool StaticMesh::loadMeshDataFromFile( const std::string& name, const std::string& filePath ) {
-        //_meshes = OBJLoader::LoadObjFile( "assets/models/sibenik.obj" );
+    const bool StaticMesh::loadMeshDataFromFile( const TString& name, const TString& filePath ) {
+
+        Logger::Trace( "Loading static mesh '%s' from file '%s'", name.CStr(), filePath.CStr() );
 
         // Listen for an asset loaded event.
         Event::Listen( EventType::ASSET_LOADED, this );

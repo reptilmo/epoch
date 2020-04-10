@@ -19,7 +19,7 @@ namespace Epoch {
     };
 
     struct StaticMeshData {
-        std::string Name;
+        TString Name;
         std::vector<Epoch::Vertex3D> Vertices;
         std::vector<U32> Indices;
 
@@ -30,26 +30,28 @@ namespace Epoch {
 
     class StaticMesh : public IEventHandler {
     public:
-        static StaticMesh* FromFile( const std::string name, const std::string filePath, const bool autoUploadToGPU = true );
+        static StaticMesh* FromFile( const TString& name, const TString& filePath, const bool autoUploadToGPU = true );
 
     public:
+        StaticMesh();
+        StaticMesh( const TString& name, const TString& filePath, const bool autoUploadToGPU = true );
+        virtual ~StaticMesh();
+        virtual void OnEvent( const Event* event ) override;
 
-        virtual void OnEvent( const Event* event );
+        const MeshRendererReferenceData* GetMeshReferenceData( const U64 index ) const noexcept { return &_meshes[index].RendererReferenceData; }
 
-        const MeshRendererReferenceData* GetMeshReferenceData( const U64 index ) const { return &_meshes[index].RendererReferenceData; }
+        const U64 GetMeshDataCount() const noexcept { return _meshes.size(); }
 
-        const U64 GetMeshDataCount() const { return _meshes.size(); }
-
-        const bool IsUploaded() const { return _isUploaded; }
+        const bool IsUploaded() const noexcept { return _isUploaded; }
 
     private:
-        const bool loadMeshDataFromFile( const std::string& name, const std::string& filePath );
+        const bool loadMeshDataFromFile( const TString& name, const TString& filePath );
         const bool uploadToGPU();
         void onDataLoaded( std::vector<StaticMeshData> data );
 
     private:
-        std::string _name;
-        std::string _path;
+        TString _name;
+        TString _path;
         bool _autoUpload = false;
         bool _isUploaded = false;
         std::vector<StaticMeshData> _meshes;

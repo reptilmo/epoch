@@ -14,6 +14,8 @@
 
 namespace Epoch {
 
+    class ICommandBuffer;
+
     enum class VulkanBufferType {
         VERTEX,
         INDEX,
@@ -21,11 +23,11 @@ namespace Epoch {
     };
 
     struct VulkanBufferDataBlock {
-        U64 ElementCount;
-        U64 ElementSize;
-        U64 Offset;
-        U64 HeapIndex;
-        U64 BlockSize;
+        U64 ElementCount = 0;
+        U64 ElementSize = 0;
+        U64 Offset = 0;
+        U64 HeapIndex = 0;
+        U64 BlockSize = 0;
         bool Allocated = false;
 
         void CopyFrom( const VulkanBufferDataBlock* other ) {
@@ -80,6 +82,14 @@ namespace Epoch {
          * by ObjectID only.
          */
         const LinkedListNode<VulkanBufferDataBlock*>* PeekDataBlock() { return _allocations.Peek(); }
+
+        /**
+         * Binds this buffer to the given command buffer using the given offset.
+         *
+         * @param commandBuffer The command buffer to bind to.
+         * @param offset The offset in bytes to be bound.
+         */
+        virtual void Bind( ICommandBuffer* commandBuffer, const U64 offset ) = 0;
 
         /**
          * Sets all data in the buffer. Calls Allocate() first.

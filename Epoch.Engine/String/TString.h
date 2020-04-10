@@ -58,6 +58,12 @@ namespace Epoch {
         void Append( const TString& str );
         void Append( const char* str, U64 length );
 
+        void Clear();
+
+        static TString Format( const char* format, ... );
+        static I32 vsnPrintf( char* dest, I32 size, const char* fmt, va_list argptr );
+        friend int tvsprintf( TString& dest, const char* fmt, va_list ap );
+
     public:
         const U32 Length() const;
         const U32 Length();
@@ -189,12 +195,12 @@ namespace Epoch {
     }
 
     FORCEINLINE char TString::operator[]( int index ) {
-        ASSERT( ( index >= 0 ) && ( index <= _length ) );
+        ASSERT( ( index >= 0 ) && ( index <= (I32)_length ) );
         return _data[index];
     }
 
     FORCEINLINE const char& TString::operator[]( int index ) const {
-        ASSERT( ( index >= 0 ) && ( index <= _length ) );
+        ASSERT( ( index >= 0 ) && ( index <= (I32)_length ) );
         return _data[index];
     }
 

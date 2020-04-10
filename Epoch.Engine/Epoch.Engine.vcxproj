@@ -49,6 +49,8 @@
     <IncludePath>C:\VulkanSDK\1.2.131.2\Include;$(SolutionDir)External\Include;$(IncludePath)</IncludePath>
     <CustomBuildAfterTargets>
     </CustomBuildAfterTargets>
+    <CodeAnalysisRuleSet>..\CodeAnalysis.ruleset</CodeAnalysisRuleSet>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -71,6 +73,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)External\Lib;C:\VulkanSDK\1.2.131.2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/NODEFAULTLIB:glfw3.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
       <Command>$(SolutionDir)tools\post-build.bat $(SolutionDir)</Command>

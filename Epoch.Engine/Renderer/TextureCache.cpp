@@ -20,9 +20,10 @@ namespace Epoch {
         if( entry == _textureCache.end() ) {
             return false;
         } else {
-            Logger::Warn( "Obtaining new reference to a texture named '%s'.", entry->first.CStr() );
+            Logger::Trace( "Obtaining new reference to a texture named '%s'.", entry->first.CStr() );
             entry->second.ReferenceCount++;
             *texture = entry->second.Texture;
+            return true;
         }
     }
 

@@ -1,4 +1,7 @@
 
+#include <stdarg.h>
+#include <stdio.h>
+
 #include "../Defines.h"
 #include "../Logger.h"
 
@@ -6,13 +9,11 @@
 #define TSTRING_SIZE_ALLOCATION_GRANULARITY 32
 #endif // !TSTRING_SIZE_ALLOCATION_GRANULARITY
 
-
-
 #include "TString.h"
 
 namespace Epoch {
 
-    
+
 
     TString::TString() {
         buildDefault();
@@ -22,10 +23,10 @@ namespace Epoch {
         buildDefault();
 
         if( str ) {
-            U64 l = strlen( str );
+            U32 l = (U32)strlen( str );
             ensureAllocated( l + 1 );
             strcpy( _data, str );
-            _length = (U32)l;
+            _length = l;
         }
     }
 
@@ -34,7 +35,7 @@ namespace Epoch {
         U32 l = other.Length();
         ensureAllocated( l + 1 );
         strcpy( _data, other._data );
-        _length = (U32)l;
+        _length = l;
     }
 
     TString::TString( const bool b ) {
@@ -56,7 +57,7 @@ namespace Epoch {
     TString::TString( const U8 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%u", u );
+        U32 length = sprintf( text, "%u", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -64,7 +65,7 @@ namespace Epoch {
     TString::TString( const U16 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%u", u );
+        U32 length = sprintf( text, "%u", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -72,7 +73,7 @@ namespace Epoch {
     TString::TString( const U32 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%u", u );
+        U32 length = sprintf( text, "%u", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -80,7 +81,7 @@ namespace Epoch {
     TString::TString( const U64 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%u", u );
+        U32 length = sprintf( text, "%I64u", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -88,7 +89,7 @@ namespace Epoch {
     TString::TString( const I8 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%d", u );
+        U32 length = sprintf( text, "%d", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -96,7 +97,7 @@ namespace Epoch {
     TString::TString( const I16 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%d", u );
+        U32 length = sprintf( text, "%d", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -104,7 +105,7 @@ namespace Epoch {
     TString::TString( const I32 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%d", u );
+        U32 length = sprintf( text, "%d", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -112,7 +113,7 @@ namespace Epoch {
     TString::TString( const I64 u ) {
         buildDefault();
         char text[64];
-        U64 length = sprintf( text, "%d", u );
+        U32 length = sprintf( text, "%I64i", u );
         ensureAllocated( length + 1 );
         strcpy( _data, text );
         _length = length;
@@ -120,7 +121,7 @@ namespace Epoch {
     TString::TString( const F32 f ) {
         buildDefault();
         char text[64];
-        U64 length = snprintf( text, sizeof( text ), "%f", f );
+        U32 length = snprintf( text, sizeof( text ), "%f", f );
 
         // Strip trailing zeroes
         while( length > 0 && text[length - 1] == '0' ) {
@@ -140,7 +141,7 @@ namespace Epoch {
     TString::TString( const F64 f ) {
         buildDefault();
         char text[64];
-        U64 length = snprintf( text, sizeof( text ), "%f", f );
+        U32 length = snprintf( text, sizeof( text ), "%f", f );
 
         // Strip trailing zeroes
         while( length > 0 && text[length - 1] == '0' ) {
@@ -183,9 +184,9 @@ namespace Epoch {
     }
 
     void TString::Append( const TString& str ) {
-        U64 newLength = (U64)_length + str.Length();
+        U32 newLength = _length + str.Length();
         ensureAllocated( newLength + 1 );
-        for( U64 i = 0; i < str.Length(); ++i ) {
+        for( U32 i = 0; i < str.Length(); ++i ) {
             _data[_length + i] = str[i];
         }
         _length = newLength;
@@ -193,17 +194,56 @@ namespace Epoch {
     }
 
     void TString::Append( const char* str, U64 length ) {
-        U64 newLength = 0;
+        U32 newLength = 0;
 
         if( str && length ) {
             newLength = _length + 1;
             ensureAllocated( newLength + 1 );
-            for( U64 i = 0; str[i] && i < length; ++i ) {
+            for( U32 i = 0; str[i] && i < length; ++i ) {
                 _data[_length + i] = str[i];
             }
             _length = newLength;
             _data[_length] = '\0';
         }
+    }
+
+    void TString::Clear() {
+        freeData();
+        buildDefault();
+    }
+
+    TString TString::Format( const char* format, ... ) {
+        TString result;
+        va_list args;
+        va_start( args, format );
+        tvsprintf( result, format, args );
+        va_end( args );
+        return result;
+    }
+
+    I32 TString::vsnPrintf( char* dest, I32 size, const char* fmt, va_list argptr ) {
+        int ret;
+
+#ifdef _WIN32
+        ret = _vsnprintf( dest, size - 1, fmt, argptr );
+#else
+        ret = vsnprintf( dest, size, fmt, argptr );
+#endif
+        dest[size - 1] = '\0';
+        if( ret < 0 || ret >= size ) {
+            return -1;
+        }
+        return ret;
+    }
+
+    int tvsprintf( TString& dest, const char* fmt, va_list ap ) {
+        I32 length = 0;
+        char buffer[32000];
+        length = TString::vsnPrintf( buffer, sizeof( buffer ) - 1, fmt, ap );
+        buffer[sizeof( buffer ) - 1] = '\0';
+
+        dest = buffer;
+        return length;
     }
 
     void TString::buildDefault() {
@@ -278,7 +318,7 @@ namespace Epoch {
                 _data[i] = str[i];
             }
             _data[i] = '\0';
-            _length -= addrDiff;
+            _length -= (U32)addrDiff;
 
             return;
         }
@@ -290,9 +330,9 @@ namespace Epoch {
     }
 
     void TString::operator=( const TString& other ) {
-        U64 length = other.Length();
+        U32 length = other.Length();
         ensureAllocated( length + 1, false );
-        memcpy( _data, other.Data(), length );
+        memcpy( _data, other.Data(), (U64)length );
         _data[length] = '\0';
         _length = length;
     }
@@ -359,7 +399,7 @@ namespace Epoch {
         char text[64];
         TString result( a );
 
-        sprintf( text, "%u", b );
+        sprintf( text, "%I64u", b );
         result.Append( text );
         return result;
     }
@@ -392,7 +432,7 @@ namespace Epoch {
         char text[64];
         TString result( a );
 
-        sprintf( text, "%i", b );
+        sprintf( text, "%I64i", b );
         result.Append( text );
         return result;
     }
@@ -404,13 +444,13 @@ namespace Epoch {
     }
 
     const bool operator==( const TString& a, const TString& b ) {
-        return TString::Compare( a, b );
+        return TString::Compare( a, b ) == 0;
     }
     const bool operator==( const TString& a, const char* b ) {
-        return TString::Compare( a, b );
+        return TString::Compare( a, b ) == 0;
     }
     const bool operator==( const char* a, const TString& b ) {
-        return TString::Compare( a, b );
+        return TString::Compare( a, b ) == 0;
     }
 
     const bool operator!=( const TString& a, const TString& b ) {
@@ -456,7 +496,7 @@ namespace Epoch {
     }
     TString& TString::operator+=( const U64 u ) {
         char text[64];
-        sprintf( text, "%u", u );
+        sprintf( text, "%I64u", u );
         Append( text );
         return *this;
     }
@@ -481,7 +521,7 @@ namespace Epoch {
     }
     TString& TString::operator+=( const I64 i ) {
         char text[64];
-        sprintf( text, "%i", i );
+        sprintf( text, "%I64i", i );
         Append( text );
         return *this;
     }

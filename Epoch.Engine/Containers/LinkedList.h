@@ -192,6 +192,7 @@ namespace Epoch {
         }
 
         ASSERT_MSG( false, "LinkedListNode::InsertAt Attempted to insert an an index which is outside the bounds of this list." );
+        return nullptr;
     }
 
     template<class T>

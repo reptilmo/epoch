@@ -21,7 +21,10 @@ namespace Epoch {
     class VulkanImage;
     class VulkanTexture;
     class VulkanUniformBuffer;
+
+#if _DEBUG
     class VulkanDebugger;
+#endif
     class VulkanDevice;
     class VulkanSwapchain;
     class VulkanFence;
@@ -80,45 +83,38 @@ namespace Epoch {
     private:
         void createInstance();
         void createRenderPass();
-        //void createGraphicsPipeline();
-        
         void createUniformBuffers();
         void updateUniformBuffers( U32 currentImageIndex );
-        /*void createDescriptorSetLayout();
-        void createDescriptorPool();
-        void createDescriptorSets();*/
-        //void updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VulkanTextureSampler* sampler );
         void createCommandBuffers();
         void createSyncObjects();
         void cleanupSwapchain();
         void recreateSwapchain();
-
-        // Asset loading temp
         void createBuffers();
     private:
-        U32 _currentImageIndex;
-        Platform* _platform;
+        U32 _currentImageIndex = 0;
+        Platform* _platform = nullptr;
 
         std::vector<const char*> _requiredValidationLayers;
 
-        VkInstance _instance;
-        VulkanDevice* _device;
+        VkInstance _instance = nullptr;
+        VulkanDevice* _device = nullptr;
 
-        VulkanDebugger* _debugger;
+#if _DEBUG
+        VulkanDebugger* _debugger = nullptr;
+#endif
 
-        VkSurfaceKHR _surface;
+        VkSurfaceKHR _surface = nullptr;
 
-        IShader* _unlitShader;
+        // Shaders
+        IShader* _unlitShader = nullptr;
 
 
-        VulkanSwapchain* _swapchain;
+        VulkanSwapchain* _swapchain = nullptr;
         bool _recreatingSwapchain = false;
         bool _framebufferResizeOccurred = false;
 
         // Command buffers
         std::vector<VulkanCommandBuffer*> _commandBuffers;
-
-        
 
         // Sync objects
         std::vector<VulkanSemaphore*> _imageAvailableSemaphores;
@@ -129,9 +125,9 @@ namespace Epoch {
         // 1 per swap chain image.
         std::vector<VulkanUniformBuffer*> _uniformBuffers;
 
-        // Asset load temp
-        VulkanVertex3DBuffer* _vertexBuffer;
-        VulkanIndexBuffer* _indexBuffer;
+        // Buffers
+        VulkanVertex3DBuffer* _vertexBuffer = nullptr;
+        VulkanIndexBuffer* _indexBuffer = nullptr;
 
         std::vector<const MeshRendererReferenceData*> _currentRenderList;
     };

@@ -69,8 +69,8 @@ namespace Epoch {
 
     private:
         // Remove the ability to instantiate this class.
-        RendererFrontEnd() {}
-        ~RendererFrontEnd() {}
+        RendererFrontEnd() noexcept {}
+        ~RendererFrontEnd() noexcept {}
 
     private:
 

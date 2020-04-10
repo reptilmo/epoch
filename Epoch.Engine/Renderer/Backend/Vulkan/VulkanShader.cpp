@@ -49,7 +49,7 @@ namespace Epoch {
         VK_CHECK( vkCreateShaderModule( _device->LogicalDevice, &shaderCreateInfo, nullptr, &_handle ) );
 
         // Create shader stage info.
-        _shaderStageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        _shaderStageCreateInfo = { VkStructureType::VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         _shaderStageCreateInfo.stage = stage;
         _shaderStageCreateInfo.module = _handle;
         _shaderStageCreateInfo.pName = "main";
@@ -86,8 +86,6 @@ namespace Epoch {
         if( hasCompute ) {
             _computeModule = new VulkanShaderModule( device, name, ShaderType::Compute );
         }
-
-
     }
 
     VulkanShader::~VulkanShader() {
@@ -147,10 +145,11 @@ namespace Epoch {
         VK_CHECK( vkResetDescriptorPool( _device->LogicalDevice, _descriptorPools[frameIndex], 0 ) );
     }
 
-    void VulkanShader::Bind( VulkanCommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex ) {
-        _graphicsPipeline->Bind( commandBuffer );
+    void VulkanShader::BindPipeline( ICommandBuffer* commandBuffer ) {
+        _graphicsPipeline->Bind( static_cast<VulkanCommandBuffer*>( commandBuffer ) );
+    }
 
-        // Note: might need to be a separate step
+    void VulkanShader::UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) {
 
         // Fill an array with pointers to the descriptor set layout.
         std::vector<VkDescriptorSetLayout> layouts( _imageCount, _descriptorSetLayout );
@@ -161,18 +160,16 @@ namespace Epoch {
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &_descriptorSetLayout;
 
-        //_descriptorSets.resize( _imageCount );
         VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, &_descriptorSets[frameIndex][objectIndex] ) );
     }
 
-    void VulkanShader::UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) {
-
+    void VulkanShader::BindDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex ) {
+        vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[frameIndex][objectIndex], 0, nullptr );
     }
 
     void VulkanShader::intialize() {
         createDescriptorSetLayout();
         createDescriptorPools();
-        //createDescriptorSets();
         createTextureSamplers();
         createPipeline( _device->FramebufferSize );
 
@@ -187,7 +184,9 @@ namespace Epoch {
         }
     }
 
-
+    // ////////////////////////////////////////////////////////////////////////////////////////
+    // ///////////////////////////////////// Unlit Shader /////////////////////////////////////
+    // ////////////////////////////////////////////////////////////////////////////////////////
 
     VulkanUnlitShader::VulkanUnlitShader( VulkanDevice* device, const U32 imageCount, const TString& renderPassName ) :
         VulkanShader( device, BUILTIN_SHADER_NAME_UNLIT, imageCount, renderPassName, true, true, false, false ) {
@@ -201,11 +200,12 @@ namespace Epoch {
 
     void VulkanUnlitShader::UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) {
 
-        // Configure the descriptors for the given index..
+        VulkanShader::UpdateDescriptor( commandBuffer, frameIndex, objectIndex, uniformBuffer, material );
+
+        // Configure the descriptors for the given index.
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = static_cast<VulkanUniformBuffer*>( uniformBuffer )->GetHandle();
         bufferInfo.offset = 0;
-
         bufferInfo.range = sizeof( StandardUniformBufferObject );
 
         UnlitMaterial* castMaterial = static_cast<UnlitMaterial*>( material );
@@ -223,7 +223,7 @@ namespace Epoch {
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].pNext = nullptr;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // For a UBO
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &bufferInfo;
 
@@ -242,9 +242,6 @@ namespace Epoch {
         }
 
         vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
-
-        // NOTE: might have to happen in a separate step
-        vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[frameIndex][objectIndex], 0, nullptr );
     }
 
     void VulkanUnlitShader::createDescriptorSetLayout() {
@@ -300,21 +297,6 @@ namespace Epoch {
             VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &poolInfo, nullptr, &_descriptorPools[i] ) );
         }
     }
-
-    //void VulkanUnlitShader::createDescriptorSets() {
-
-    //    // Fill an array with pointers to the descriptor set layout.
-    //    std::vector<VkDescriptorSetLayout> layouts( _imageCount, _descriptorSetLayout );
-
-    //    VkDescriptorSetAllocateInfo allocInfo = {};
-    //    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    //    allocInfo.descriptorPool = _descriptorPool;
-    //    allocInfo.descriptorSetCount = _imageCount;
-    //    allocInfo.pSetLayouts = layouts.data();
-
-    //    _descriptorSets.resize( _imageCount );
-    //    VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, _descriptorSets.data() ) );
-    //}
 
     void VulkanUnlitShader::createTextureSamplers() {
         for( U32 i = 0; i < _imageCount; ++i ) {

@@ -29,7 +29,9 @@
 #include "VulkanVertex3DBuffer.h"
 #include "VulkanIndexBuffer.h"
 #include "VulkanUniformBuffer.h"
+#if _DEBUG
 #include "VulkanDebugger.h"
+#endif
 #include "VulkanDevice.h"
 #include "VulkanRenderPassManager.h"
 #include "VulkanFence.h"
@@ -67,7 +69,9 @@ namespace Epoch {
         createInstance();
 
         // Create debugger
+#if _DEBUG
         _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
+#endif
 
         // Create the surface
         _platform->CreateSurface( _instance, &_surface );
@@ -77,9 +81,6 @@ namespace Epoch {
 
         // HACK: This is here until the platform layer is removed.
         _device->FramebufferSize = _platform->GetFramebufferExtent();
-
-        // Shader creation.
-        //_unlitShader = new VulkanUnlitShader( _device, "main", true, true, false, false );
 
         // Create swapchain
         Extent2D extent = _platform->GetFramebufferExtent();
@@ -96,14 +97,6 @@ namespace Epoch {
         // Built-in shader creation.
         _unlitShader = new VulkanUnlitShader( _device, _swapchain->GetSwapchainImageCount(), "RenderPass.Default" );
 
-        //createDescriptorSetLayout();
-
-        //createGraphicsPipeline();
-
-        //// Create samplers - one per in-flight frame. TODO: should probably be held by the shader.
-        //_textureSamplers[0] = new VulkanTextureSampler( _device );
-        //_textureSamplers[1] = new VulkanTextureSampler( _device );
-
         // TODO: load model
         createBuffers();
 
@@ -111,12 +104,6 @@ namespace Epoch {
 
         // Create UBOs
         createUniformBuffers();
-        //createDescriptorPool();
-        //createDescriptorSets();
-        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-        for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            //updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
-        }
 
         createCommandBuffers();
         createSyncObjects();
@@ -149,7 +136,6 @@ namespace Epoch {
         }
         _commandBuffers.clear();
 
-        //vkDestroyDescriptorPool( _device->LogicalDevice, _descriptorPool, nullptr );
 
         for( auto buffer : _uniformBuffers ) {
             delete buffer;
@@ -166,33 +152,7 @@ namespace Epoch {
             _vertexBuffer = nullptr;
         }
 
-        // TEMP
-        /*if( _textureSamplers[0] ) {
-            delete _textureSamplers[0];
-            _textureSamplers[0] = nullptr;
-        }
 
-        if( _textureSamplers[1] ) {
-            delete _textureSamplers[1];
-            _textureSamplers[1] = nullptr;
-        }*/
-
-        /*if( _textures[0] ) {
-            delete _textures[0];
-            _textures[0] = nullptr;
-        }*/
-
-        /*if( _textures[1] ) {
-            delete _textures[1];
-            _textures[1] = nullptr;
-        }*/
-
-        /*if( _graphicsPipeline ) {
-            delete _graphicsPipeline;
-            _graphicsPipeline = nullptr;
-        }*/
-
-        //         vkDestroyDescriptorSetLayout( _device->LogicalDevice, _descriptorSetLayout, nullptr );
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
         if( _swapchain ) {
@@ -207,10 +167,12 @@ namespace Epoch {
 
         vkDestroySurfaceKHR( _instance, _surface, nullptr );
 
+#if _DEBUG
         if( _debugger ) {
             delete _debugger;
             _debugger = nullptr;
         }
+#endif
 
         if( _device ) {
             delete _device;
@@ -246,32 +208,24 @@ namespace Epoch {
             return false;
         }
 
-
-
-        //// Update the current descriptor set.
-        //BaseMaterial* material = _currentRenderList[0]->Material;
-        //updateDescriptorSet( _currentImageIndex, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
-
         // Begin recording.
-        _commandBuffers[_currentImageIndex]->Begin();
+        VulkanCommandBuffer* currentCommandBuffer = _commandBuffers[_currentImageIndex];
+        currentCommandBuffer->Begin();
 
         // Begin the render pass. TODO: Should probably create these once and reuse.
         VulkanRenderPass* renderPass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
         RenderPassClearInfo clearInfo;
         clearInfo.Color.Set( 0.0f, 0.0f, 0.2f, 0.0f );
-        clearInfo.RenderArea.Set( 0, 0, _swapchain->Extent.width, _swapchain->Extent.height );
+        clearInfo.RenderArea.Set( 0, 0, (F32)_swapchain->Extent.width, (F32)_swapchain->Extent.height );
         clearInfo.Depth = 1.0f;
         clearInfo.Stencil = 0;
-        _commandBuffers[_currentImageIndex]->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
+        currentCommandBuffer->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
 
-        U64 renderListCount = _currentRenderList.size();
+        U32 renderListCount = (U32)_currentRenderList.size();
 
-        // Bind the buffer to the graphics pipeline
-        //_graphicsPipeline->Bind( _commandBuffers[_currentImageIndex] );
-        // Get a flat list of all shaders.
-
+        // Get a flat list of all shaders currently in use.
         std::vector<IShader*> frameShaders;
-        for( U64 i = 0; i < renderListCount; ++i ) {
+        for( U32 i = 0; i < renderListCount; ++i ) {
             bool added = false;
             IShader* shader = _currentRenderList[i]->Material->GetShader();
             for( auto fs : frameShaders ) {
@@ -291,43 +245,39 @@ namespace Epoch {
         }
 
         // Draw everything in the render list.        
-        for( U64 i = 0; i < renderListCount; ++i ) {
+        for( U32 i = 0; i < renderListCount; ++i ) {
             const MeshRendererReferenceData* ref = _currentRenderList[i];
             const VulkanBufferDataBlock* vertexBlock = _vertexBuffer->GetDataRangeByIndex( ref->VertexHeapIndex );
             const VulkanBufferDataBlock* indexBlock = _indexBuffer->GetDataRangeByIndex( ref->IndexHeapIndex );
 
             // Update the current descriptor set.
-            UnlitMaterial* material = (UnlitMaterial*)ref->Material;
-            VulkanShader* shader = (VulkanShader*)material->GetShader();
+            IShader* shader = ref->Material->GetShader();
 
             // Bind the buffer to the graphics pipeline
-            shader->Bind( _commandBuffers[_currentImageIndex], _currentImageIndex, i );
+            shader->BindPipeline( currentCommandBuffer );
 
             // Update the descriptor for this object.
-            shader->UpdateDescriptor( _commandBuffers[_currentImageIndex], _currentImageIndex, i, _uniformBuffers[_currentImageIndex], material );
+            shader->UpdateDescriptor( currentCommandBuffer, _currentImageIndex, i, _uniformBuffers[_currentImageIndex], ref->Material );
+
+            shader->BindDescriptor( currentCommandBuffer, _currentImageIndex, i );
             
-            // Bind vertex buffers
-            VkBuffer vertexBuffers[] = { _vertexBuffer->GetHandle() };
-            VkDeviceSize offsets[] = { vertexBlock->Offset }; // was 0
-            vkCmdBindVertexBuffers( _commandBuffers[_currentImageIndex]->GetHandle(), 0, 1, vertexBuffers, offsets );
+            // Bind vertex buffer
+            _vertexBuffer->Bind( currentCommandBuffer, vertexBlock->Offset );
 
             // Bind index buffer
-            vkCmdBindIndexBuffer( _commandBuffers[_currentImageIndex]->GetHandle(), _indexBuffer->GetHandle(), indexBlock->Offset, VK_INDEX_TYPE_UINT32 ); // offset was 0
+            _indexBuffer->Bind( currentCommandBuffer, indexBlock->Offset );
 
-            // Bind descriptor sets (UBOs and samplers)
-            //vkCmdBindDescriptorSets( _commandBuffers[_currentImageIndex]->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_descriptorSets[_currentImageIndex], 0, nullptr );
-
-            // Make the draw call. TODO: use object properties
+            // Make the draw call.
             //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
 
-            vkCmdDrawIndexed( _commandBuffers[_currentImageIndex]->GetHandle(), (U32)indexBlock->ElementCount, 1, 0, 0, 0 ); // _indexBuffer->GetElementCount()
+            vkCmdDrawIndexed( currentCommandBuffer->GetHandle(), (U32)indexBlock->ElementCount, 1, 0, 0, 0 );
         }
 
         // End render pass.
-        _commandBuffers[_currentImageIndex]->EndRenderPass();
+        currentCommandBuffer->EndRenderPass();
 
         // End recording
-        _commandBuffers[_currentImageIndex]->End();
+        currentCommandBuffer->End();
 
         return true;
     }
@@ -441,6 +391,7 @@ namespace Epoch {
         instanceCreateInfo.ppEnabledExtensionNames = platformExtensions.data();
 
         // Validation layers
+#ifdef _DEBUG
         _requiredValidationLayers.push_back( "VK_LAYER_KHRONOS_validation" );
 
         // Get available layers.
@@ -469,6 +420,10 @@ namespace Epoch {
 
         instanceCreateInfo.enabledLayerCount = (U32)_requiredValidationLayers.size();
         instanceCreateInfo.ppEnabledLayerNames = _requiredValidationLayers.data();
+#else
+        instanceCreateInfo.enabledLayerCount = 0;
+        instanceCreateInfo.ppEnabledLayerNames = nullptr;
+#endif
 
         // Create instance
         VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );
@@ -502,30 +457,6 @@ namespace Epoch {
 
         VulkanRenderPassManager::CreateRenderPass( _device, renderPassData );
     }
-
-    /*void VulkanRenderer::createGraphicsPipeline() {
-        PipelineInfo info;
-        info.Extent = _swapchain->Extent;
-        info.Renderpass = VulkanRenderPassManager::GetRenderPass( "RenderPass.Default" );
-        info.DescriptorSetLayouts.push_back( _descriptorSetLayout );
-        if( _unlitShader->HasVertexStage() ) {
-            info.ShaderStages.push_back( _unlitShader->GetVertexStage()->GetShaderStageCreateInfo() );
-        }
-
-        if( _unlitShader->HasFragmentStage() ) {
-            info.ShaderStages.push_back( _unlitShader->GetFragmentStage()->GetShaderStageCreateInfo() );
-        }
-
-        if( _unlitShader->HasGeometryStage() ) {
-            info.ShaderStages.push_back( _unlitShader->GetGeometryStage()->GetShaderStageCreateInfo() );
-        }
-
-        if( _unlitShader->HasComputeStage() ) {
-            info.ShaderStages.push_back( _unlitShader->GetComputeStage()->GetShaderStageCreateInfo() );
-        }
-
-        _graphicsPipeline = new VulkanGraphicsPipeline( _device, info );
-    }*/
 
     void VulkanRenderer::createUniformBuffers() {
         VkDeviceSize bufferSize = sizeof( StandardUniformBufferObject );
@@ -562,108 +493,7 @@ namespace Epoch {
         TMemory::Memcpy( data, &ubo, sizeof( ubo ) );
         _uniformBuffers[currentImageIndex]->GetInternal()->UnlockMemory();
     }
-    /*
-    void VulkanRenderer::createDescriptorSetLayout() {
-        VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-        uboLayoutBinding.binding = 0;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-
-        VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-        samplerLayoutBinding.binding = 1;
-        samplerLayoutBinding.descriptorCount = 1;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutBinding bindings[2] = {
-            uboLayoutBinding,
-            samplerLayoutBinding
-        };
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = (U32)2;
-        layoutInfo.pBindings = bindings;
-
-        VK_CHECK( vkCreateDescriptorSetLayout( _device->LogicalDevice, &layoutInfo, nullptr, &_descriptorSetLayout ) );
-    }
-
-    void VulkanRenderer::createDescriptorPool() {
-        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-        VkDescriptorPoolSize poolSizes[2];
-        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = swapchainImageCount;
-        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = swapchainImageCount;
-
-        VkDescriptorPoolCreateInfo poolInfo = {};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 2;
-        poolInfo.pPoolSizes = poolSizes;
-        poolInfo.maxSets = swapchainImageCount;
-
-        VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &poolInfo, nullptr, &_descriptorPool ) );
-    }
-    void VulkanRenderer::createDescriptorSets() {
-        U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-        // Fill an array with pointers to the descriptor set layout.
-        std::vector<VkDescriptorSetLayout> layouts( swapchainImageCount, _descriptorSetLayout );
-
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = _descriptorPool;
-        allocInfo.descriptorSetCount = (U32)swapchainImageCount;
-        allocInfo.pSetLayouts = layouts.data();
-
-        _descriptorSets.resize( swapchainImageCount );
-        VK_CHECK( vkAllocateDescriptorSets( _device->LogicalDevice, &allocInfo, _descriptorSets.data() ) );
-    }
-
-    void VulkanRenderer::updateDescriptorSet( U64 descriptorSetIndex, VulkanImage* textureImage, VulkanTextureSampler* sampler ) {
-
-        // Configure the descriptors for the given index..
-        VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = _uniformBuffers[descriptorSetIndex]->GetHandle();
-        bufferInfo.offset = 0;
-
-        bufferInfo.range = sizeof( StandardUniformBufferObject );
-
-        VkDescriptorImageInfo imageInfo = {};
-        if( textureImage != nullptr ) {
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureImage->GetView();
-            imageInfo.sampler = sampler->GetHandle();
-        }
-
-        std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = _descriptorSets[descriptorSetIndex];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].pNext = nullptr;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // For a UBO
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = _descriptorSets[descriptorSetIndex];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].pNext = nullptr;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        if( textureImage != nullptr ) {
-            descriptorWrites[1].pImageInfo = &imageInfo;
-        } else {
-            descriptorWrites[1].pImageInfo = nullptr;
-        }
-
-        vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
-    }*/
-
+    
     void VulkanRenderer::createCommandBuffers() {
         U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U32 i = 0; i < swapchainImageCount; ++i ) {

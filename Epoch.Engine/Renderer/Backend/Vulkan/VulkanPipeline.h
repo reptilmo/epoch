@@ -10,9 +10,9 @@ namespace Epoch {
     class VulkanRenderPass;
 
     struct PipelineInfo {
-        VkExtent2D Extent;
+        VkExtent2D Extent = { 0, 0 };
         std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
-        VulkanRenderPass* Renderpass;
+        VulkanRenderPass* Renderpass = nullptr;
         std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
     };
 
@@ -25,9 +25,9 @@ namespace Epoch {
         VkPipelineLayout GetLayout() { return _layout; }
 
     protected:
-        VkPipeline _handle;
-        VkPipelineLayout _layout;
-        VulkanDevice* _device;
+        VkPipeline _handle = nullptr;
+        VkPipelineLayout _layout = nullptr;
+        VulkanDevice* _device = nullptr;
     };
 
     class VulkanGraphicsPipeline : public VulkanPipeline {

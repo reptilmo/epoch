@@ -79,6 +79,7 @@ namespace Epoch {
             colorAttachment.stencilStoreOp = getLoadOp( color.StencilStoreOperation );
             colorAttachment.initialLayout = (VkImageLayout)color.InputLayout;
             colorAttachment.finalLayout = (VkImageLayout)color.OutputLayout;
+            colorAttachment.flags = 0;
 
             attachments.push_back( colorAttachment );
 
@@ -146,6 +147,8 @@ namespace Epoch {
         renderPassCreateInfo.pSubpasses = &subpass;
         renderPassCreateInfo.dependencyCount = 1;
         renderPassCreateInfo.pDependencies = &dependency;
+        renderPassCreateInfo.pNext = nullptr;
+        renderPassCreateInfo.flags = 0;
 
         VK_CHECK( vkCreateRenderPass( device->LogicalDevice, &renderPassCreateInfo, nullptr, &_handle ) );
     }

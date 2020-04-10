@@ -36,9 +36,9 @@ namespace Epoch {
         VkPipelineShaderStageCreateInfo _shaderStageCreateInfo;
     };
 
-    /*
-     Represents a Vulkan shader, complete with the appropriate stage modules.
-    */
+    /**
+     * Represents a Vulkan-specific shader, complete with the appropriate stage modules.
+     */
     class VulkanShader : public IShader, public IEventHandler {
     public:
         VulkanShader( VulkanDevice* device, const char* name, const U32 imageCount, const TString& renderPassName, const bool hasVertex, const bool hasFragment, const bool hasGeometry, const bool hasCompute );
@@ -46,9 +46,10 @@ namespace Epoch {
 
         void OnEvent( const Event* event ) override;
 
-        void ResetDescriptors( const U32 frameIndex );
-        void Bind( VulkanCommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex );
-        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material );
+        virtual void ResetDescriptors( const U32 frameIndex ) override;
+        virtual void BindPipeline( ICommandBuffer* commandBuffer ) override;
+        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) override = 0;
+        virtual void BindDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex ) override;
 
         const bool HasVertexStage() const override { return _vertexModule != nullptr; }
         const bool HasFragmentStage() const override { return _fragmentModule != nullptr; }

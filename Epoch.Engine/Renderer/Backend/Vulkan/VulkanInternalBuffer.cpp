@@ -59,7 +59,7 @@ namespace Epoch {
 
     void* VulkanInternalBuffer::LockMemory( U64 offset, U64 size, U64 flags ) {
         void* pData;
-        VK_CHECK( vkMapMemory( _device->LogicalDevice, _memory, offset, size, flags, &pData ) );
+        VK_CHECK( vkMapMemory( _device->LogicalDevice, _memory, offset, size, (U32)flags, &pData ) );
         return pData;
     }
 
