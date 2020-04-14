@@ -89,7 +89,7 @@ namespace Epoch {
          * @param commandBuffer The command buffer to bind to.
          * @param offset The offset in bytes to be bound.
          */
-        virtual void Bind( ICommandBuffer* commandBuffer, const U64 offset ) = 0;
+        virtual void Bind( ICommandBuffer* commandBuffer, const U64 offset ) {}
 
         /**
          * Sets all data in the buffer. Calls Allocate() first.
@@ -440,6 +440,8 @@ namespace Epoch {
             prev->Value->BlockSize += p->Value->BlockSize;
             prev->Value->ElementSize += p->Value->ElementSize;
             _allocations.RemoveAt( index );
+            index--;
+            p = prev;
         }
 
         // Check if the next block is unallocated. If so, combine it with

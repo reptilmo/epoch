@@ -50,7 +50,7 @@ namespace Epoch {
 
         static const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData );
 
-        static void FreeMeshData( const U64 index );
+        static void FreeMeshData( MeshRendererReferenceData* referenceData );
 
         /**
          * Obtains a texture reference to the provided name. Path, for now, is required.

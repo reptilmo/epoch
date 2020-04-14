@@ -40,7 +40,7 @@ namespace Epoch {
 
     void StaticMesh::OnEvent( const Event* event ) {
         if( event->Type == EventType::ASSET_LOADED ) {
-            const AssetLoadedEvent* typedEvent = static_cast<const AssetLoadedEvent*>( event );
+            const AssetLoadedEvent* typedEvent = reinterpret_cast<const AssetLoadedEvent*>( event );
             if( typedEvent->Data->GetName() == _name ) {
                 // The correct asset has loaded, stop listening for asset loaded events.
                 Event::StopListening( EventType::ASSET_LOADED, this );
@@ -48,6 +48,18 @@ namespace Epoch {
                 // Load the data.
                 const StaticMeshAssetData* typedData = static_cast<const StaticMeshAssetData*>( typedEvent->Data );
                 onDataLoaded( typedData->GetData() );
+            }
+        }
+    }
+
+    void StaticMesh::Unload() {
+        if( _isUploaded ) {
+            for( StaticMeshData& mesh : _meshes ) {
+                if( mesh.Vertices.size() == 0 || mesh.Indices.size() == 0 ) {
+                    continue;
+                }
+
+                RendererFrontEnd::FreeMeshData( &mesh.RendererReferenceData );
             }
         }
     }
@@ -106,7 +118,7 @@ namespace Epoch {
         }
 
         _isUploaded = true;
-        Logger::Trace( "Done." );
+        Logger::Trace( "Mesh loading complete: %s", _path.CStr() );
         return true;
     }
 

@@ -73,7 +73,8 @@ namespace Epoch {
         static const bool Exists( const TString& name );
         static BaseMaterial* Get( const TString& name );
 
-        static void Release( const TString& name );
+        static void Add( const TString& name, BaseMaterial* material );
+        static void Release( const TString name );
 
         static UnlitMaterial* CreateUnlit( const TString& name, const TString& diffusePath );
 

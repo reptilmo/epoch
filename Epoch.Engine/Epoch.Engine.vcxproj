@@ -149,7 +149,7 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanInternalBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanPipeline.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanQueue.cpp" />
-    <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderer.cpp" />
+    <ClCompile Include="Renderer\Backend\Vulkan\VulkanRendererBackend.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPass.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderPassManager.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRenderTarget.cpp" />
@@ -158,7 +158,6 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanSwapchain.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanTexture.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanTextureSampler.cpp" />
-    <ClCompile Include="Renderer\Backend\Vulkan\VulkanUniformBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanUtilities.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.cpp" />
     <ClCompile Include="Renderer\Frontend\RendererFrontEnd.cpp" />
@@ -223,7 +222,6 @@
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanSwapchain.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanTexture.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanTextureSampler.h" />
-    <ClInclude Include="Renderer\Backend\Vulkan\VulkanUniformBuffer.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanVertex3DBuffer.h" />
     <ClInclude Include="Renderer\Frontend\RendererFrontend.h" />
     <ClInclude Include="Renderer\ICommandBuffer.h" />
@@ -232,7 +230,7 @@
     <ClInclude Include="Renderer\Material.h" />
     <ClInclude Include="Renderer\MeshData.h" />
     <ClInclude Include="Renderer\RenderPassData.h" />
-    <ClInclude Include="Renderer\StandardUniformBufferObject.h" />
+    <ClInclude Include="Renderer\UniformObject.h" />
     <ClInclude Include="Renderer\TextureCache.h" />
     <ClInclude Include="Renderer\Vertex3D.h" />
     <ClInclude Include="Resources\IImage.h" />
@@ -243,7 +241,7 @@
     <ClInclude Include="String\TString.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanImage.h" />
-    <ClInclude Include="Renderer\Backend\Vulkan\VulkanRenderer.h" />
+    <ClInclude Include="Renderer\Backend\Vulkan\VulkanRendererBackend.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanUtilities.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

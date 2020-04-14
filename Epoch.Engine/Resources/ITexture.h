@@ -6,6 +6,7 @@ namespace Epoch {
 
     class ITexture {
     public:
+        virtual ~ITexture() {}
         virtual const char* GetName() const = 0;
 
         virtual IImage* GetImage() = 0;

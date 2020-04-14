@@ -10,7 +10,7 @@
 
 namespace Epoch {
 
-    class VulkanRenderer;
+    class VulkanRendererBackend;
 
     class VulkanUtilities {
     public:

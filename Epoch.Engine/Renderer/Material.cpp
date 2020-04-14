@@ -4,6 +4,7 @@
 
 #include "../Logger.h"
 #include "../Resources/ITexture.h"
+#include "../String/StringUtilities.h"
 #include "Frontend/RendererFrontend.h"
 
 #include "Material.h"
@@ -51,7 +52,7 @@ namespace Epoch {
         BaseMaterial* Material;
     };
 
-    std::map<TString, MaterialEntry> _materials;
+    std::map<TString, MaterialEntry, TStringCompare> _materials;
     UnlitMaterial* _defaultMaterial;
     U64 _defaultMaterialReferences = 0;
 
@@ -92,7 +93,26 @@ namespace Epoch {
         }
     }
 
-    void MaterialManager::Release( const TString& name ) {
+    void MaterialManager::Add( const TString& name, BaseMaterial* material ) {
+        auto entry = _materials.find( name );
+        if( entry == _materials.end() ) {
+
+            Logger::Trace( "Adding a new material named '%s' to the material cache.", name.CStr() );
+
+            // New entry, as expected
+            MaterialEntry newEntry;
+            newEntry.ReferenceCount = 1;
+            newEntry.Material = material;
+            _materials.emplace( TString( name ), newEntry );
+        } else {
+            // Already exists, just increase reference count and slap the user.
+
+            Logger::Warn( "Attempted to add a material named '%s' to the material manager which already exists. Call Get instead.", entry->first.CStr() );
+            entry->second.ReferenceCount++;
+        }
+    }
+
+    void MaterialManager::Release( const TString name ) {
         auto entry = _materials.find( name );
         if( entry == _materials.end() ) {
             if( name == _defaultMaterial->Name ) {
@@ -104,9 +124,10 @@ namespace Epoch {
         } else {
             entry->second.ReferenceCount--;
             if( entry->second.ReferenceCount <= 0 ) {
-                Logger::Trace( "All known references to material '%s' have been released. Unloading material." );
+                Logger::Trace( "All known references to material '%s' have been released. Unloading material.", name.CStr() );
                 delete entry->second.Material;
-                _materials.erase( name );
+                entry->second.Material = nullptr;
+                _materials.erase( name.CStr() );
             }
         }
     }

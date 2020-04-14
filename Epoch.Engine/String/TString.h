@@ -203,5 +203,4 @@ namespace Epoch {
         ASSERT( ( index >= 0 ) && ( index <= (I32)_length ) );
         return _data[index];
     }
-
 }

@@ -4,6 +4,7 @@
 
 #include "../Types.h"
 #include "../String/TString.h"
+#include "../String/StringUtilities.h"
 
 namespace Epoch {
 
@@ -17,7 +18,9 @@ namespace Epoch {
     class TextureCache {
     public:
         TextureCache();
+        ~TextureCache();
 
+        void Initialize();
         const bool GetTextureReference( const TString& textureName, ITexture** texture );
         const bool Exists( const TString& textureName );
         void Add( const TString& textureName, ITexture* texture );
@@ -27,7 +30,7 @@ namespace Epoch {
 
     private:
         // TODO: optimize by using FNames instead.
-        std::map<TString, TextureCacheEntry> _textureCache;
+        std::map<TString, TextureCacheEntry, TStringCompare> _textureCache;
         ITexture* _defaultWhiteTexture;
     };
 }

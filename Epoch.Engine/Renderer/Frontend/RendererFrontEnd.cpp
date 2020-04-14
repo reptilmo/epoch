@@ -2,7 +2,7 @@
 #include "../../Engine.h"
 #include "../../Logger.h"
 #include "../Backend/IRendererBackend.h"
-#include "../Backend/Vulkan/VulkanRenderer.h"
+#include "../Backend/Vulkan/VulkanRendererBackend.h"
 #include "../TextureCache.h"
 #include "../Material.h"
 
@@ -25,9 +25,6 @@ namespace Epoch {
 
     // TEMP
     static StaticMesh* testMesh;
-    static ITexture* textures[2];
-    static U64 updatesTemp = 0;
-    static U64 currentTextureIndex = 0;
 
     const bool RendererFrontEnd::Initialize( Engine* engine ) {
 
@@ -36,22 +33,39 @@ namespace Epoch {
 
         // TODO: Choose this from configuration instead of hardcoding it.
         // TODO: Should probably be created via factory to prevent this class from knowing about the specific type.
-        _backend = new VulkanRenderer( _engine->GetPlatform() );
+        _backend = new VulkanRendererBackend( _engine->GetPlatform() );
         _backend->Initialize();
 
         _textureCache = new TextureCache();
+        _textureCache->Initialize();
         MaterialManager::Initialize();
 
         // TEMP: Load a test mesh
         testMesh = StaticMesh::FromFile( "test", "assets/models/sibenik.obj", true );
-        textures[0] = _backend->GetTexture( TString( "test512" ), TString( "assets/textures/test512.png" ) );
-        textures[1] = _backend->GetTexture( TString( "testice" ), TString( "assets/textures/testice.jpg" ) );
 
         return true;
     }
 
     void RendererFrontEnd::Shutdown() {
         _engine = nullptr;
+
+        if( testMesh ) {
+            testMesh->Unload();
+            delete testMesh;
+            testMesh = nullptr;
+        }
+
+        if( _backend ) {
+            _backend->Shutdown();
+        }
+
+        MaterialManager::Shutdown();
+
+        if( _textureCache ) {
+            delete _textureCache;
+            _textureCache = nullptr;
+        }
+
         if( _backend ) {
             _backend->Destroy();
             delete _backend;
@@ -72,35 +86,34 @@ namespace Epoch {
         // TODO: All front-end work goes here (scene sorting, culling, etc) before the frame call.
 
         // If the frame preparation indicates we should wait, boot out early.
-        if( !_backend->PrepareFrame( deltaTime ) ) {
+        if( !_backend->IsShutdown() ) {
+            if( !_backend->PrepareFrame( deltaTime ) ) {
+                return true;
+            }
+
+            return _backend->Frame( deltaTime );
+        } else {
             return true;
         }
-
-        // Update descriptors if need be. TEST: Swap texture
-        // Must happen before queue is started below.
-        updatesTemp++;
-        if( updatesTemp > 3000 ) {
-            currentTextureIndex = ( currentTextureIndex == 0 ? 1 : 0 );
-            updatesTemp = 0;
-        }
-
-        return _backend->Frame( deltaTime );
     }
 
     const bool RendererFrontEnd::UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) {
         return _backend->UploadMeshData( data, referenceData );
     }
 
-    void RendererFrontEnd::FreeMeshData( const U64 index ) {
-        _backend->FreeMeshData( index );
+    void RendererFrontEnd::FreeMeshData( MeshRendererReferenceData* referenceData ) {
+        _backend->FreeMeshData( referenceData );
     }
 
     ITexture* RendererFrontEnd::GetTexture( const TString& name, const TString& path, const bool bypassCache ) {
         ITexture* texture;
-        if( !bypassCache && _textureCache->Exists( name ) ) {
+        if( _textureCache->Exists( name ) ) {
             _textureCache->GetTextureReference( name, &texture );
         } else {
             texture = _backend->GetTexture( name, path );
+            if( !bypassCache ) {
+                _textureCache->Add( name, texture );
+            }
         }
 
         return texture;
@@ -114,7 +127,7 @@ namespace Epoch {
         if( _textureCache->Exists( name ) ) {
             _textureCache->Release( name );
         } else {
-            Logger::Warn( "Tried to release a texture not owned by the renderer." );
+            Logger::Warn( "Tried to release a texture not owned by the renderer: '%s'", name.CStr() );
         }
     }
 

@@ -5,7 +5,7 @@
 #include "../../../Memory/Memory.h"
 #include "../../../Assets/Image/ImageUtilities.h"
 
-#include "VulkanRenderer.h"
+#include "VulkanRendererBackend.h"
 #include "VulkanUtilities.h"
 #include "VulkanInternalBuffer.h"
 #include "VulkanImage.h"

@@ -1,7 +1,4 @@
 
-#include <vector>
-#include <fstream>
-
 // TODO: temp
 #include <chrono>
 
@@ -16,7 +13,6 @@
 #include "../../../Math/Quaternion.h"
 #include "../../../String/TString.h"
 
-#include "../../StandardUniformBufferObject.h"
 #include "../../../Resources/ITexture.h"
 #include "../../MeshData.h"
 #include "../../Material.h"
@@ -28,7 +24,6 @@
 #include "VulkanInternalBuffer.h"
 #include "VulkanVertex3DBuffer.h"
 #include "VulkanIndexBuffer.h"
-#include "VulkanUniformBuffer.h"
 #if _DEBUG
 #include "VulkanDebugger.h"
 #endif
@@ -40,22 +35,19 @@
 #include "VulkanSwapchain.h"
 #include "VulkanCommandPool.h"
 #include "VulkanCommandBuffer.h"
-#include "VulkanPipeline.h"
-#include "VulkanTextureSampler.h"
 #include "VulkanQueue.h"
 #include "VulkanShader.h"
 
-#include "VulkanRenderer.h"
+#include "VulkanRendererBackend.h"
 
 namespace Epoch {
 
-    VulkanRenderer::VulkanRenderer( Platform* platform ) {
+    VulkanRendererBackend::VulkanRendererBackend( Platform* platform ) {
         _platform = platform;
-        Logger::Trace( "Creating Vulkan renderer..." );
-
+        Logger::Trace( "Creating Vulkan renderer backend..." );
     }
 
-    VulkanRenderer::~VulkanRenderer() {
+    VulkanRendererBackend::~VulkanRendererBackend() {
         if( _instance ) {
 
             // Make sure things are destroyed.
@@ -63,8 +55,8 @@ namespace Epoch {
         }
     }
 
-    const bool VulkanRenderer::Initialize() {
-        Logger::Trace( "Initializing Vulkan renderer..." );
+    const bool VulkanRendererBackend::Initialize() {
+        Logger::Trace( "Initializing Vulkan renderer backend..." );
 
         createInstance();
 
@@ -89,7 +81,6 @@ namespace Epoch {
         // Listen for resize events.
         Event::Listen( EventType::WINDOW_RESIZED, this );
 
-
         // Create renderpass.
         createRenderPass();
         _swapchain->RegenerateFramebuffers();
@@ -97,24 +88,20 @@ namespace Epoch {
         // Built-in shader creation.
         _unlitShader = new VulkanUnlitShader( _device, _swapchain->GetSwapchainImageCount(), "RenderPass.Default" );
 
-        // TODO: load model
         createBuffers();
-
-        // End asset loading.
-
-        // Create UBOs
-        createUniformBuffers();
-
         createCommandBuffers();
         createSyncObjects();
-
-
 
         return true;
     }
 
-    void VulkanRenderer::Destroy() {
-        VK_CHECK( vkDeviceWaitIdle( _device->LogicalDevice ) );
+    void VulkanRendererBackend::Shutdown() {
+        _isShutDown = true;
+        _device->WaitIdle();
+    }
+
+    void VulkanRendererBackend::Destroy() {
+        _device->WaitIdle();
 
         // sync objects
         for( U8 i = 0; i < _swapchain->MaxFramesInFlight; ++i ) {
@@ -136,12 +123,6 @@ namespace Epoch {
         }
         _commandBuffers.clear();
 
-
-        for( auto buffer : _uniformBuffers ) {
-            delete buffer;
-        }
-        _uniformBuffers.clear();
-
         if( _indexBuffer ) {
             delete _indexBuffer;
             _indexBuffer = nullptr;
@@ -155,14 +136,14 @@ namespace Epoch {
 
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
 
-        if( _swapchain ) {
-            delete _swapchain;
-            _swapchain = nullptr;
-        }
-
         if( _unlitShader ) {
             delete _unlitShader;
             _unlitShader = nullptr;
+        }
+
+        if( _swapchain ) {
+            delete _swapchain;
+            _swapchain = nullptr;
         }
 
         vkDestroySurfaceKHR( _instance, _surface, nullptr );
@@ -185,7 +166,7 @@ namespace Epoch {
         }
     }
 
-    const bool VulkanRenderer::PrepareFrame( const F32 deltaTime ) {
+    const bool VulkanRendererBackend::PrepareFrame( const F32 deltaTime ) {
 
         // If currently recreating the swapchain, boot out.
         if( _recreatingSwapchain ) {
@@ -239,9 +220,40 @@ namespace Epoch {
             }
         }
 
+
+
+        // TEMP
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        F32 time = std::chrono::duration<F32, std::chrono::seconds::period>( currentTime - startTime ).count();
+
+
+        Rotator rotator;
+        rotator.Pitch = time * 90.0f * 0.1f;
+        rotator.Roll = 90.0f;
+        Matrix4x4 model = Matrix4x4::Identity();
+        model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
+        model *= rotator.ToQuaternion().ToMatrix4x4();
+
+        // TODO: obtain from camera
+        Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
+
+        // TODO: obtain from private var, set only on change of camera/window
+        VkExtent2D extent = _swapchain->Extent;
+        Matrix4x4 projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)extent.width / (F32)extent.height, 0.1f, 1000.0f );
+
+        // END TEMP
+
         // Reset the shader descriptors
         for( auto fs : frameShaders ) {
             fs->ResetDescriptors( _currentImageIndex );
+
+            // TODO: Don't create this every frame, save off locally
+            GlobalUniformObject guo;
+            guo.Projection = projection;
+            guo.View = view;
+            fs->SetGlobalUniform( currentCommandBuffer, guo, _currentImageIndex );
         }
 
         // Draw everything in the render list.        
@@ -256,11 +268,14 @@ namespace Epoch {
             // Bind the buffer to the graphics pipeline
             shader->BindPipeline( currentCommandBuffer );
 
+            shader->SetModel( model );
+
             // Update the descriptor for this object.
-            shader->UpdateDescriptor( currentCommandBuffer, _currentImageIndex, i, _uniformBuffers[_currentImageIndex], ref->Material );
+            shader->UpdateDescriptor( currentCommandBuffer, _currentImageIndex, i, ref->Material );
+
 
             shader->BindDescriptor( currentCommandBuffer, _currentImageIndex, i );
-            
+
             // Bind vertex buffer
             _vertexBuffer->Bind( currentCommandBuffer, vertexBlock->Offset );
 
@@ -282,7 +297,7 @@ namespace Epoch {
         return true;
     }
 
-    const bool VulkanRenderer::Frame( const F32 deltaTime ) {
+    const bool VulkanRendererBackend::Frame( const F32 deltaTime ) {
 
         // Check if a previous frame is using this image (i.e. its fence is being waited on)
         U8 swapchainFrameIndex = _swapchain->GetCurrentFrameIndex();
@@ -292,9 +307,6 @@ namespace Epoch {
 
         // Mark the image fence as in-use by this frame.
         _inFlightImageFences[swapchainFrameIndex] = _inFlightFences[swapchainFrameIndex];
-
-        // UBO
-        updateUniformBuffers( _currentImageIndex );
 
         // Reset the fence for use on the next frame.
         _inFlightImageFences[swapchainFrameIndex]->Reset();
@@ -315,7 +327,7 @@ namespace Epoch {
         return true;
     }
 
-    const bool VulkanRenderer::UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) {
+    const bool VulkanRendererBackend::UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) {
 
         _device->GraphicsQueue->WaitIdle();
 
@@ -328,15 +340,23 @@ namespace Epoch {
         return true;
     }
 
-    void VulkanRenderer::FreeMeshData( const U64 index ) {
+    void VulkanRendererBackend::FreeMeshData( MeshRendererReferenceData* referenceData ) {
 
+        _device->WaitIdle();
+
+        // Release the material reference.
+        MaterialManager::Release( referenceData->Material->Name );
+
+        // Release buffer data by index.
+        _vertexBuffer->FreeDataRangeByIndex( referenceData->VertexHeapIndex );
+        _indexBuffer->FreeDataRangeByIndex( referenceData->VertexHeapIndex );
     }
 
-    void VulkanRenderer::AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) {
+    void VulkanRendererBackend::AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) {
         _currentRenderList.push_back( referenceData );
     }
 
-    void VulkanRenderer::OnEvent( const Event* event ) {
+    void VulkanRendererBackend::OnEvent( const Event* event ) {
         switch( event->Type ) {
         case EventType::WINDOW_RESIZED:
             //const WindowResizedEvent wre = (const WindowResizedEvent)event;
@@ -350,15 +370,15 @@ namespace Epoch {
         }
     }
 
-    ITexture* VulkanRenderer::GetTexture( const TString& name, const TString& path ) {
+    ITexture* VulkanRendererBackend::GetTexture( const TString& name, const TString& path ) {
         return new VulkanTexture( _device, name, path );
     }
 
-    Extent2D VulkanRenderer::GetFramebufferExtent() {
+    Extent2D VulkanRendererBackend::GetFramebufferExtent() {
         return _platform->GetFramebufferExtent();
     }
 
-    IShader* VulkanRenderer::GetBuiltinMaterialShader( const MaterialType type ) {
+    IShader* VulkanRendererBackend::GetBuiltinMaterialShader( const MaterialType type ) {
         switch( type ) {
         default:
         case MaterialType::Unlit:
@@ -366,7 +386,7 @@ namespace Epoch {
         }
     }
 
-    void VulkanRenderer::createInstance() {
+    void VulkanRendererBackend::createInstance() {
         VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
         appInfo.apiVersion = VK_API_VERSION_1_2;
         appInfo.pApplicationName = "Epoch";
@@ -429,7 +449,7 @@ namespace Epoch {
         VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );
     }
 
-    void VulkanRenderer::createRenderPass() {
+    void VulkanRendererBackend::createRenderPass() {
 
         RenderPassData renderPassData;
         renderPassData.Name = "RenderPass.Default";
@@ -458,43 +478,7 @@ namespace Epoch {
         VulkanRenderPassManager::CreateRenderPass( _device, renderPassData );
     }
 
-    void VulkanRenderer::createUniformBuffers() {
-        VkDeviceSize bufferSize = sizeof( StandardUniformBufferObject );
-
-        U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-        _uniformBuffers.resize( swapchainImageCount );
-
-        for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            _uniformBuffers[i] = new VulkanUniformBuffer( _device );
-            std::vector<StandardUniformBufferObject> udata( 1 );
-            _uniformBuffers[i]->SetData( udata );
-        }
-    }
-
-    void VulkanRenderer::updateUniformBuffers( U32 currentImageIndex ) {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        F32 time = std::chrono::duration<F32, std::chrono::seconds::period>( currentTime - startTime ).count();
-
-        VkExtent2D extent = _swapchain->Extent;
-        StandardUniformBufferObject ubo = {};
-        Rotator rotator;
-        rotator.Pitch = time * 90.0f * 0.1f;
-        rotator.Roll = 90.0f;
-        ubo.Model = Matrix4x4::Identity();
-        ubo.Model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
-        ubo.Model *= rotator.ToQuaternion().ToMatrix4x4();
-        ubo.View = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
-        ubo.Projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)extent.width / (F32)extent.height, 0.1f, 1000.0f );
-
-        // For now, since this happens every frame, just push to the buffer directly.
-        void* data = _uniformBuffers[currentImageIndex]->GetInternal()->LockMemory( 0, sizeof( ubo ), 0 );
-        TMemory::Memcpy( data, &ubo, sizeof( ubo ) );
-        _uniformBuffers[currentImageIndex]->GetInternal()->UnlockMemory();
-    }
-    
-    void VulkanRenderer::createCommandBuffers() {
+    void VulkanRendererBackend::createCommandBuffers() {
         U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         for( U32 i = 0; i < swapchainImageCount; ++i ) {
             VulkanCommandBuffer* cmdBuf = _device->CommandPool->AllocateCommandBuffer( true );
@@ -502,7 +486,7 @@ namespace Epoch {
         }
     }
 
-    void VulkanRenderer::createSyncObjects() {
+    void VulkanRendererBackend::createSyncObjects() {
         U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
         _imageAvailableSemaphores.resize( _swapchain->MaxFramesInFlight ); // _maxFramesInFlight
         _renderCompleteSemaphores.resize( _swapchain->MaxFramesInFlight );
@@ -525,8 +509,7 @@ namespace Epoch {
         }
     }
 
-    void VulkanRenderer::cleanupSwapchain() {
-
+    void VulkanRendererBackend::cleanupSwapchain() {
 
         // Free the command buffers in the pool, but do not destroy the pool.
         U32 swapchainImageCount = _swapchain->GetSwapchainImageCount();
@@ -535,22 +518,10 @@ namespace Epoch {
         }
         _commandBuffers.clear();
 
-        /*if( _graphicsPipeline ) {
-            delete _graphicsPipeline;
-            _graphicsPipeline = nullptr;
-        }*/
-
-
         VulkanRenderPassManager::DestroyRenderPass( _device, "RenderPass.Default" );
-
-        // Destroy UBOs
-
-        // Destroy descriptor pool
-
-
     }
 
-    void VulkanRenderer::recreateSwapchain() {
+    void VulkanRendererBackend::recreateSwapchain() {
         if( _recreatingSwapchain ) {
             return;
         }
@@ -569,21 +540,14 @@ namespace Epoch {
         cleanupSwapchain();
 
         createRenderPass();
-        //createGraphicsPipeline();
         _swapchain->RegenerateFramebuffers();
-        createUniformBuffers();
-        //createDescriptorPool();
-       // createDescriptorSets();
-        /*U64 swapchainImageCount = _swapchain->GetSwapchainImageCount();
-        for( U64 i = 0; i < swapchainImageCount; ++i ) {
-            updateDescriptorSet( i, (VulkanImage*)_textures[_currentTextureIndex]->GetImage(), _textureSamplers[_currentTextureIndex] );
-        }*/
+
         createCommandBuffers();
 
         _recreatingSwapchain = false;
     }
 
-    void VulkanRenderer::createBuffers() {
+    void VulkanRendererBackend::createBuffers() {
 
         // Vertex buffer.
         _vertexBuffer = new VulkanVertex3DBuffer( _device );

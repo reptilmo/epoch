@@ -48,6 +48,10 @@ namespace Epoch {
         PresentationQueue = nullptr;
     }
 
+    void VulkanDevice::WaitIdle() const {
+        VK_CHECK( vkDeviceWaitIdle( LogicalDevice ) );
+    }
+
     VulkanCommandBuffer* VulkanDevice::AllocateAndBeginSingleUseCommandBuffer() {
         VulkanCommandBuffer* commandBuffer = CommandPool->AllocateCommandBuffer( true );
         commandBuffer->Begin( true, false, false );

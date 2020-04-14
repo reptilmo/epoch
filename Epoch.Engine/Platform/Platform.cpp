@@ -58,8 +58,10 @@ namespace Epoch {
         while( !glfwWindowShouldClose( _window ) ) {
             glfwPollEvents();
 
-            if( !_engine->OnLoop( 0 ) ) {
-                Logger::Fatal( "Engine loop failed! See logs for details." );
+            if( !glfwWindowShouldClose( _window ) ) {
+                if( !_engine->OnLoop( 0 ) ) {
+                    Logger::Fatal( "Engine loop failed! See logs for details." );
+                }
             }
         }
 
@@ -73,7 +75,7 @@ namespace Epoch {
     }
 
     void Platform::onFrameBufferResize( GLFWwindow* window, I32 width, I32 height ) {
-        WindowResizedEvent resizeEvent( window, 0, 0, (U32)width, (U32)height );
-        resizeEvent.Post();
+        WindowResizedEvent* resizeEvent = new WindowResizedEvent( window, 0, 0, (U32)width, (U32)height );
+        resizeEvent->Post( true );
     }
 }

@@ -11,8 +11,18 @@ namespace Epoch {
 
     TextureCache::TextureCache() {
         Logger::Trace( "Created texture cache." );
+    }
 
+    TextureCache::~TextureCache() {
+        if( _defaultWhiteTexture ) {
+            delete _defaultWhiteTexture;
+            _defaultWhiteTexture = nullptr;
+        }
+    }
+
+    void TextureCache::Initialize() {
         _defaultWhiteTexture = RendererFrontEnd::GetTexture( "__DEFAULT_WHITE__", "assets/textures/defaultwhite.jpg", true );
+        Logger::Trace( "Initialized texture cache." );
     }
 
     const bool TextureCache::GetTextureReference( const TString& textureName, ITexture** texture ) {
@@ -28,20 +38,20 @@ namespace Epoch {
     }
 
     const bool TextureCache::Exists( const TString& textureName ) {
-        return ( _textureCache.find( textureName.CStr() ) != _textureCache.end() );
+        return ( _textureCache.find( textureName ) != _textureCache.end() );
     }
 
     void TextureCache::Add( const TString& textureName, ITexture* texture ) {
         auto entry = _textureCache.find( textureName );
         if( entry == _textureCache.end() ) {
 
-            Logger::Warn( "Adding a new texture named '%s' to the texture cache.", entry->first.CStr() );
+            Logger::Trace( "Adding a new texture named '%s' to the texture cache.", textureName.CStr() );
 
             // New entry, as expected
             TextureCacheEntry newEntry;
             newEntry.ReferenceCount = 1;
             newEntry.Texture = texture;
-            _textureCache.emplace( textureName.CStr(), newEntry );
+            _textureCache.emplace( TString( textureName ), newEntry );
         } else {
             // Already exists, just increase reference count and slap the user.
 

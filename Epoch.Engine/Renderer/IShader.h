@@ -2,9 +2,12 @@
 
 namespace Epoch {
 
+    struct GlobalUniformObject;
+
     class ICommandBuffer;
     class IUniformBuffer;
     class BaseMaterial;
+    class Matrix4x4;
 
     enum class ShaderType {
         Vertex,
@@ -19,6 +22,9 @@ namespace Epoch {
      */
     class IShader {
     public:
+
+        virtual ~IShader() {}
+
         /**
          * Indicates if this shader has a vertex stage.
          */
@@ -49,27 +55,42 @@ namespace Epoch {
 
         /**
          * Binds the internal graphics pipeline to the provided command buffer. Should be called once per object, per frame.
-         * 
+         *
          * @param commandBuffer The command buffer to which the pipeline should be bound.
          */
         virtual void BindPipeline( ICommandBuffer* commandBuffer ) = 0;
 
         /**
+         * Sets global uniform information on this shader (such as view and projection matrices).
+         *
+         * @param commandBuffer The command buffer to bind to.
+         * @param uniform The uniform data to be set.
+         * @param frameIndex The current index of the frame (or swapchain image) being drawn to.
+         */
+        virtual void SetGlobalUniform( ICommandBuffer* commandBuffer, const GlobalUniformObject& uniform, const U32 frameIndex ) = 0;
+
+        /**
+         * Sets the model matrix on this shader.
+         *
+         * @param model A reference to the model matrix to be used.
+         */
+        virtual void SetModel( const Matrix4x4& model ) = 0;
+
+        /**
          * Updates the descriptors for the given frame and object indices. Should be done after BindPipeline.
          * Should be called once per object, per frame.
-         * 
+         *
          * @param commandBuffer The commandBuffer currently being recorded to.
          * @param frameIndex The current index of the frame (or swapchain image) being drawn to.
          * @param objectIndex The current list index of the object being rendered.
-         * @param uniformBuffer The uniform buffer to be bound.
          * @param material A pointer to the material whose properties should be bound.
          */
-        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, IUniformBuffer* uniformBuffer, BaseMaterial* material ) = 0;
+        virtual void UpdateDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex, BaseMaterial* material ) = 0;
 
         /**
          * Binds the internal descriptor to the provided pipeline. Should be completed after UpdateDescriptor.
          * Should be called once per object, per frame.
-         * 
+         *
          * @param commandBuffer The commandBuffer currently being recorded to.
          * @param frameIndex The current index of the frame (or swapchain image) being drawn to.
          * @param objectIndex The current list index of the object being rendered.
