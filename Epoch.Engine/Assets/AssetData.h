@@ -1,7 +1,8 @@
 #pragma once
 
-#include <string>
 #include <vector>
+
+#include "../String/TString.h"
 
 namespace Epoch {
 
@@ -15,19 +16,19 @@ namespace Epoch {
     class AssetData {
     public:
 
-        AssetData( const std::string path, const std::string name, const AssetType type ) {
+        AssetData( const TString& path, const TString& name, const AssetType type ) {
             _path = path;
             _name = name;
             _type = type;
         }
 
-        const std::string& GetName() const { return _name; }
-        const std::string& GetPath() const { return _path; }
-        const AssetType GetType() const { return _type; }
+        const TString& GetName() const noexcept { return _name; }
+        const TString& GetPath() const noexcept { return _path; }
+        const AssetType GetType() const noexcept { return _type; }
 
     protected:
-        std::string _name;
-        std::string _path;
+        TString _name;
+        TString _path;
         AssetType _type;
     };
 }

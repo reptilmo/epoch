@@ -40,9 +40,9 @@ namespace Epoch {
         /**
          * Posts this event.
          * 
-         * @param immediate Indicates if this event will be handled immediately or be queued on a subsequent frame.
+         * @param immediate Indicates if this event will be handled immediately or be queued on a subsequent frame. Default: false
          */
-        void Post( const bool immediate = true );
+        void Post( const bool immediate );
 
         /**
          * Registers the given handler to recieve events of the given type.

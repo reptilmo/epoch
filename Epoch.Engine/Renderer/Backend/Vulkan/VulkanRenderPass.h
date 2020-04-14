@@ -11,10 +11,10 @@ namespace Epoch {
     class VulkanCommandBuffer;
 
     struct RenderPassClearInfo {
-        Vector4 Color;
-        Vector4 RenderArea;
-        F32 Depth;
-        U32 Stencil;
+        Vector4 Color = { 0,0,0,0 };
+        Vector4 RenderArea = { 0,0,0,0 };
+        F32 Depth = 0;
+        U32 Stencil = 0;
     };
 
     class VulkanRenderPass {

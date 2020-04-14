@@ -26,16 +26,16 @@ namespace Epoch {
     struct RenderTargetOptions {
 
         // Image format.
-        U32 Format;
+        U32 Format = 0;
 
         // per-pixel samples. Default: 1.
         U8 SampleCount = 1;
-        RenderTargetLoadOperation LoadOperation;
-        RenderTargetStoreOperation StoreOperation;
-        RenderTargetLoadOperation StencilLoadOperation;
-        RenderTargetStoreOperation StencilStoreOperation;
-        U32 InputLayout;
-        U32 OutputLayout;
+        RenderTargetLoadOperation LoadOperation = RenderTargetLoadOperation::DONT_CARE;
+        RenderTargetStoreOperation StoreOperation = RenderTargetStoreOperation::DONT_CARE;
+        RenderTargetLoadOperation StencilLoadOperation = RenderTargetLoadOperation::DONT_CARE;
+        RenderTargetStoreOperation StencilStoreOperation = RenderTargetStoreOperation::DONT_CARE;
+        U32 InputLayout = 0;
+        U32 OutputLayout = 0;
     };
 
     struct RenderPassData {

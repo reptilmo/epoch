@@ -48,6 +48,10 @@ namespace Epoch {
         PresentationQueue = nullptr;
     }
 
+    void VulkanDevice::WaitIdle() const {
+        VK_CHECK( vkDeviceWaitIdle( LogicalDevice ) );
+    }
+
     VulkanCommandBuffer* VulkanDevice::AllocateAndBeginSingleUseCommandBuffer() {
         VulkanCommandBuffer* commandBuffer = CommandPool->AllocateCommandBuffer( true );
         commandBuffer->Begin( true, false, false );
@@ -250,9 +254,13 @@ namespace Epoch {
         };
         deviceCreateInfo.ppEnabledExtensionNames = requiredExtensions;
 
-        // TODO: disable on release builds.
+#if _DEBUG
         deviceCreateInfo.enabledLayerCount = (U32)requiredValidationLayers.size();
         deviceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
+#else
+        deviceCreateInfo.enabledLayerCount = 0;
+        deviceCreateInfo.ppEnabledLayerNames = nullptr;
+#endif
 
         // Create the device
         VK_CHECK( vkCreateDevice( PhysicalDevice, &deviceCreateInfo, nullptr, &LogicalDevice ) );

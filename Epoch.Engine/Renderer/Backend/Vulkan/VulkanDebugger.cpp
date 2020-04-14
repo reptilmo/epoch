@@ -34,7 +34,7 @@ namespace Epoch {
         _instance = instance;
 
         // Error severity is always shown. The others are tacked on as they are needed.
-        U64 severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        U32 severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         if( ( level & VulkanDebuggerLevel::WARNING ) == VulkanDebuggerLevel::WARNING ) {
             severity |= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
         }

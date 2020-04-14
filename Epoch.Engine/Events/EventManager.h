@@ -6,6 +6,10 @@
 
 namespace Epoch {
 
+    /*
+     Manages events across the system. A new event may be posted, to which listeners will
+     listen. Events have a type, which may be 
+    */
     class EventManager {
     public:
         static void Post( const Event* event, const bool immediate );

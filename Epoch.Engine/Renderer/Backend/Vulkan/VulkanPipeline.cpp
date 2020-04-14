@@ -187,6 +187,7 @@ namespace Epoch {
         pipelineCreateInfo.pDepthStencilState = &depthStencil;
         pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
         pipelineCreateInfo.pDynamicState = nullptr;
+        pipelineCreateInfo.pTessellationState = nullptr;
 
         pipelineCreateInfo.layout = _layout;
 

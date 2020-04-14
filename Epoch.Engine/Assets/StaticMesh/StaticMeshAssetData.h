@@ -8,13 +8,15 @@
 
 namespace Epoch {
 
+    class TString;
+
     /**
      * Represents raw static mesh asset data, used to load a static mesh.
      */
     class StaticMeshAssetData : public AssetData {
     public:
 
-        StaticMeshAssetData( const std::string path, const std::string name, std::vector<StaticMeshData> data ) :AssetData( path, name, AssetType::StaticMesh ) {
+        StaticMeshAssetData( const TString& path, const TString& name, std::vector<StaticMeshData> data ) :AssetData( path, name, AssetType::StaticMesh ) {
             _data = data;
         }
 

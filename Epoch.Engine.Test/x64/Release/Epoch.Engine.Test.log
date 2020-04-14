@@ -1,0 +1,8 @@
+﻿  pch.cpp
+  LinkedList.Test.cpp
+     Creating library C:\Development\epoch\x64\Release\Epoch.Engine.Test.lib and object C:\Development\epoch\x64\Release\Epoch.Engine.Test.exp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 39 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  Epoch.Engine.Test.vcxproj -> C:\Development\epoch\x64\Release\Epoch.Engine.Test.dll

@@ -48,7 +48,7 @@ namespace Epoch {
         } else {
             // TODO: recycle these objects.
         }
-
+        return nullptr;
     }
 
     void VulkanCommandPool::FreeCommandBuffer( VulkanCommandBuffer* commandBuffer ) {

@@ -1,12 +1,13 @@
 #pragma once
 
 #include <vector>
-#include <string>
 #include <functional>
 
 #include "../StaticMesh.h"
 
 namespace Epoch {
+
+    class TString;
 
     typedef std::function<void( std::vector<StaticMeshData> )> StaticMeshLoadedCallback;
 
@@ -24,9 +25,9 @@ namespace Epoch {
          *
          * @returns A collection of meshes.
          */
-        static void LoadObjFile( const std::string& name, const std::string& path );
+        static void LoadObjFile( const TString& name, const TString& path );
 
     private:
-        static void loadOnThread( const std::string& name, const std::string& path );
+        static void loadOnThread( const TString& name, const TString& path );
     };
 }

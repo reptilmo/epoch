@@ -77,6 +77,7 @@ namespace Epoch {
             const Event* e = _eventQueue.front();
             _eventQueue.pop();
             processEvent( e );
+
             delete e;
             e = nullptr;
 

@@ -8,6 +8,8 @@
 
 namespace Epoch {
 
+    class BaseMaterial;
+
     struct MeshUploadData {
         std::vector<Vertex3D> Vertices;
         std::vector<U32> Indices;
@@ -16,5 +18,7 @@ namespace Epoch {
     struct MeshRendererReferenceData {
         U64 VertexHeapIndex;
         U64 IndexHeapIndex;
+
+        BaseMaterial* Material;
     };
 }

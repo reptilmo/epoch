@@ -90,6 +90,11 @@ namespace Epoch {
         ~VulkanDevice();
 
         /**
+         * Wait for the device to be idle (i.e. all currently running operations have completed).
+         */
+        void WaitIdle() const;
+
+        /**
          * Allocates and begins recording of a single use command buffer. This is useful for copying
          * from a staging buffer or for transitioning image layouts. Note that a call to EndSingleUseCommandBuffer
          * should be made when ready to submit for execution.

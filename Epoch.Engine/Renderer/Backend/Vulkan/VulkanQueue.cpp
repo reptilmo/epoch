@@ -41,7 +41,7 @@ namespace Epoch {
 
         // Wait semaphores
         std::vector<VkSemaphore> waitSemaphores;
-        U64 waitSemaphoreCount = commandBuffer->GetWaitSemaphores().size();
+        U32 waitSemaphoreCount = (U32)commandBuffer->GetWaitSemaphores().size();
         if( waitSemaphoreCount > 0 ) {
             waitSemaphores.clear();
             for( auto semaphore : commandBuffer->GetWaitSemaphores() ) {
