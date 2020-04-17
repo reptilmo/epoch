@@ -5,6 +5,7 @@
 #include "../../Types.h"
 #include "../../String/TString.h"
 #include "../../Events/IEventHandler.h"
+#include "../../Math/Transform.h"
 
 #include "../../Renderer/Vertex3D.h"
 #include "../../Renderer/MeshData.h"
@@ -129,6 +130,11 @@ namespace Epoch {
          */
         const bool IsUploaded() const noexcept { return _isUploaded; }
 
+        /**
+         * Gets the transform of this object.
+         */
+        Transform* GetTransform() { return &_transform; }
+
     private:
         const bool loadMeshDataFromFile( const TString& name, const TString& filePath );
         const bool uploadToGPU();
@@ -140,5 +146,6 @@ namespace Epoch {
         bool _autoUpload = false;
         bool _isUploaded = false;
         std::vector<StaticMeshData> _meshes;
+        Transform _transform;
     };
 }

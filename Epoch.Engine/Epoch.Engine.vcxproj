@@ -166,6 +166,8 @@
     <ClCompile Include="String\StringUtilities.cpp" />
     <ClCompile Include="String\TName.cpp" />
     <ClCompile Include="String\TString.cpp" />
+    <ClCompile Include="Time\Clock.cpp" />
+    <ClCompile Include="World\World.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Assets\AssetData.h" />
@@ -174,6 +176,7 @@
     <ClInclude Include="Assets\StaticMesh\StaticMesh.h" />
     <ClInclude Include="Assets\StaticMesh\StaticMeshAssetData.h" />
     <ClInclude Include="Containers\LinkedList.h" />
+    <ClInclude Include="Containers\List.h" />
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Events\Event.h" />
@@ -239,10 +242,12 @@
     <ClInclude Include="String\StringUtilities.h" />
     <ClInclude Include="String\TName.h" />
     <ClInclude Include="String\TString.h" />
+    <ClInclude Include="Time\Clock.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanImage.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRendererBackend.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanUtilities.h" />
+    <ClInclude Include="World\World.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

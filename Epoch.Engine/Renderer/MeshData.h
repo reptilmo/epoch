@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "../Types.h"
+#include "../Math/Transform.h"
 
 #include "Vertex3D.h"
 
@@ -20,5 +21,7 @@ namespace Epoch {
         U64 IndexHeapIndex;
 
         BaseMaterial* Material;
+
+        Transform* Transform;
     };
 }

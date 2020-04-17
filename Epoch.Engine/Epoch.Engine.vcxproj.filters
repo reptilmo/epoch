@@ -159,6 +159,12 @@
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanRendererBackend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Time\Clock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="World\World.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Types.h">
@@ -384,6 +390,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRendererBackend.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Time\Clock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="World\World.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\List.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

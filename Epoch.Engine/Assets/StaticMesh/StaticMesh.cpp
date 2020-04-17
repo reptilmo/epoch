@@ -99,6 +99,9 @@ namespace Epoch {
                 return false;
             }
 
+            // Just use the object's transform for now.
+            mesh.RendererReferenceData.Transform = &_transform;
+
             // Load/assign materials.
             if( MaterialManager::Exists( mesh.MaterialInfo.Name ) ) {
                 mesh.RendererReferenceData.Material = MaterialManager::Get( mesh.MaterialInfo.Name );

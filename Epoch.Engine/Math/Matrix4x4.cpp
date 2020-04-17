@@ -140,6 +140,7 @@ namespace Epoch {
         // Same as the DirectX implementation of this algorithm, with the exception that the zAxis is 
         // determined by reversing the subtraction of position and target.
         Vector3 zAxis = Vector3::Normalized( position - target );
+        //Vector3 zAxis = Vector3::Normalized( target - position );
         Vector3 xAxis = Vector3::Normalized( Vector3::Cross( up, zAxis ) );
         Vector3 yAxis = Vector3::Cross( zAxis, xAxis );
 

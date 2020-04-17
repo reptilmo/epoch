@@ -8,6 +8,10 @@ namespace Epoch {
     class TMemory {
     public:
 
+        static FORCEINLINE void* Allocate( const U64 size ) {
+            return malloc( size );
+        }
+
         static FORCEINLINE void Free( void* block ) {
             free( block );
         }

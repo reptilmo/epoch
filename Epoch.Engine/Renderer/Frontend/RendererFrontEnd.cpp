@@ -11,6 +11,7 @@
 // TEMP
 #include "../../Assets/StaticMesh/StaticMesh.h"
 #include "../../Resources/ITexture.h"
+#include "../../Math/Rotator.h"
 
 namespace Epoch {
 
@@ -84,6 +85,12 @@ namespace Epoch {
         }
 
         // TODO: All front-end work goes here (scene sorting, culling, etc) before the frame call.
+
+        // TEMP: rotate the mesh
+        if( testMesh->IsUploaded() ) {
+            Quaternion q = Quaternion::FromAxisAngle( Vector3::Up(), deltaTime * 1.0f );
+            testMesh->GetTransform()->rotation *= q;
+        }
 
         // If the frame preparation indicates we should wait, boot out early.
         if( !_backend->IsShutdown() ) {

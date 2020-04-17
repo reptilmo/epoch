@@ -4,6 +4,7 @@
 #include "Logger.h"
 #include "Platform/Platform.h"
 #include "Events/EventManager.h"
+#include "Time/Clock.h"
 
 #include "Engine.h"
 

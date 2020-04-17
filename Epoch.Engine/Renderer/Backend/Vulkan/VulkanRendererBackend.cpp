@@ -1,7 +1,3 @@
-
-// TODO: temp
-#include <chrono>
-
 #include "../../../Platform/Platform.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
@@ -223,25 +219,21 @@ namespace Epoch {
 
 
         // TEMP
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        F32 time = std::chrono::duration<F32, std::chrono::seconds::period>( currentTime - startTime ).count();
-
-
-        Rotator rotator;
-        rotator.Pitch = time * 90.0f * 0.1f;
-        rotator.Roll = 90.0f;
-        Matrix4x4 model = Matrix4x4::Identity();
-        model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
-        model *= rotator.ToQuaternion().ToMatrix4x4();
 
         // TODO: obtain from camera
         Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
+        //Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 0.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
 
         // TODO: obtain from private var, set only on change of camera/window
         VkExtent2D extent = _swapchain->Extent;
         Matrix4x4 projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)extent.width / (F32)extent.height, 0.1f, 1000.0f );
+        Matrix4x4 correction;
+        correction.Data()[0] = 1.0f;
+        correction.Data()[5] = -1.0f;
+        correction.Data()[10] = 0.5f;
+        correction.Data()[14] = 0.5f;
+        correction.Data()[15] = 1.0f;
+        projection *= correction;
 
         // END TEMP
 
@@ -268,7 +260,7 @@ namespace Epoch {
             // Bind the buffer to the graphics pipeline
             shader->BindPipeline( currentCommandBuffer );
 
-            shader->SetModel( model );
+            shader->SetModel( ref->Transform->GetTransformation() );
 
             // Update the descriptor for this object.
             shader->UpdateDescriptor( currentCommandBuffer, _currentImageIndex, i, ref->Material );

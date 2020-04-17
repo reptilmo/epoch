@@ -219,7 +219,29 @@ namespace Epoch {
     Rotator Quaternion::ToRotator() const {
         Rotator euler;
 
-        float qw = W;
+        // http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+        // http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/
+
+        const float SingularityTest = Z * X - W * Y;
+        const float YawY = 2.0f * ( W * Z + X * Y );
+        const float YawX = ( 1.0f - 2.0f * ( TMath::SquareRoot( Y ) + TMath::SquareRoot( Z ) ) );
+        const float SINGULARITY_THRESHOLD = 0.4999995f;
+
+        if( SingularityTest < -SINGULARITY_THRESHOLD ) {
+            euler.Pitch = -90.f;
+            euler.Yaw = TMath::ATan2( YawY, YawX ) * TMath::RAD2DEG_MULTIPLIER;
+            euler.Roll = Rotator::NormalizeAxis( -euler.Yaw - ( 2.f * TMath::ATan2( X, W ) * TMath::RAD2DEG_MULTIPLIER ) );
+        } else if( SingularityTest > SINGULARITY_THRESHOLD ) {
+            euler.Pitch = 90.f;
+            euler.Yaw = TMath::ATan2( YawY, YawX ) * TMath::RAD2DEG_MULTIPLIER;
+            euler.Roll = Rotator::NormalizeAxis( euler.Yaw - ( 2.f * TMath::ATan2( X, W ) * TMath::RAD2DEG_MULTIPLIER ) );
+        } else {
+            euler.Pitch = TMath::ASin( 2.f * ( SingularityTest ) ) * TMath::RAD2DEG_MULTIPLIER;
+            euler.Yaw = TMath::ATan2( YawY, YawX ) * TMath::RAD2DEG_MULTIPLIER;
+            euler.Roll = TMath::ATan2( -2.f * ( W * X + Y * Z ), ( 1.f - 2.f * ( TMath::SquareRoot( X ) + TMath::SquareRoot( Y ) ) ) ) * TMath::RAD2DEG_MULTIPLIER;
+        }
+
+        /*float qw = W;
         float qx = X;
         float qy = Y;
         float qz = Z;
@@ -243,7 +265,7 @@ namespace Epoch {
         }
         euler.Yaw = TMath::RadToDeg( atan2f( 2.0f * qy * qw - 2.0f * qx * qz, sqx - sqy - sqz + sqw ) );
         euler.Pitch = TMath::RadToDeg( asinf( 2.0f * test / unit ) );
-        euler.Roll = TMath::RadToDeg( atan2f( 2.0f * qx * qw - 2.0f * qy * qz, -sqx + sqy - sqz + sqw ) );
+        euler.Roll = TMath::RadToDeg( atan2f( 2.0f * qx * qw - 2.0f * qy * qz, -sqx + sqy - sqz + sqw ) );*/
         return euler;
     }
 
@@ -259,14 +281,23 @@ namespace Epoch {
 
     Quaternion Quaternion::FromAxisAngle( const Vector3& axis, const float angle, bool normalize ) {
         Quaternion q;
-        float factor = sinf( angle );
+        /*float factor = sinf( angle );
         q.X = 1 * factor;
         q.Y = 0 * factor;
         q.Z = 0 * factor;
         q.W = cosf( angle / 2.0f );
         if( normalize ) {
             q.Normalize();
-        }
+        }*/
+
+        const float half_a = 0.5f * angle;
+        float s, c;
+        TMath::SinCos( half_a ,s, c );
+
+        q.X = s * axis.X;
+        q.Y = s * axis.Y;
+        q.Z = s * axis.Z;
+        q.W = c;
 
         return q;
     }

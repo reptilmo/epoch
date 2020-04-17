@@ -50,9 +50,9 @@ namespace Epoch {
         // Viewport
         VkViewport viewport = {};
         viewport.x = 0.0f;
-        viewport.y = (F32)info.Extent.height;
+        viewport.y = 0.0f;// (F32)info.Extent.height;
         viewport.width = (F32)info.Extent.width;
-        viewport.height = -(F32)info.Extent.height;
+        viewport.height = (F32)info.Extent.height;// -(F32)info.Extent.height;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
 
