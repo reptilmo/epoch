@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 
+#include "../Events/Event.h"
 #include "../String/TString.h"
 
 namespace Epoch {
@@ -30,5 +30,22 @@ namespace Epoch {
         TString _name;
         TString _path;
         AssetType _type;
+    };
+
+    struct AssetLoadedEvent : public Event {
+    public:
+        const AssetData* Data;
+
+    public:
+        AssetLoadedEvent( const AssetData* assetData, void* sender ) : Event( EventType::ASSET_LOADED, sender ) {
+            Data = assetData;
+        }
+
+        ~AssetLoadedEvent() {
+            if( Data ) {
+                delete Data;
+                Data = nullptr;
+            }
+        }
     };
 }

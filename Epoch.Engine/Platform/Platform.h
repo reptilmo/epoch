@@ -75,6 +75,9 @@ namespace Epoch {
          * @returns A pointer to the window.
          */
         static IWindow* CreateWindow( const char* applicationName, U32 width, U32 height );
+
+        static U32 Cycles();
+        static U64 Cycles64();
     public:
 
         /**

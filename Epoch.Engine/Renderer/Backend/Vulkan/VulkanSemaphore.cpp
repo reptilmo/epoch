@@ -5,17 +5,18 @@
 
 namespace Epoch {
 
-    VulkanSemaphore::VulkanSemaphore( VulkanDevice* device ) {
+    VulkanSemaphore::VulkanSemaphore( VulkanDevice* device, const bool isSignaled ) {
         _device = device;
+        IsSignaled = isSignaled;
 
         VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };        
-        VK_CHECK( vkCreateSemaphore( _device->LogicalDevice, &semaphoreCreateInfo, nullptr, &_handle ) );
+        VK_CHECK( vkCreateSemaphore( _device->LogicalDevice, &semaphoreCreateInfo, nullptr, &Handle ) );
     }
 
     VulkanSemaphore::~VulkanSemaphore() {
-        if( _handle ) {
-            vkDestroySemaphore( _device->LogicalDevice, _handle, nullptr );
-            _handle = nullptr;
+        if( Handle ) {
+            vkDestroySemaphore( _device->LogicalDevice, Handle, nullptr );
+            Handle = nullptr;
         }
     }
 }

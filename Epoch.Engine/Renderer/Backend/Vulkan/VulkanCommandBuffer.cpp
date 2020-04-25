@@ -1,24 +1,41 @@
 
+#include "../../../Memory/Memory.h"
 #include "VulkanUtilities.h"
 #include "VulkanDevice.h"
 #include "VulkanCommandPool.h"
 #include "VulkanRenderPass.h"
+#include "VulkanSemaphore.h"
 #include "VulkanCommandBuffer.h"
+
 
 namespace Epoch {
 
     VulkanCommandBuffer::VulkanCommandBuffer( VkCommandBuffer handle, VulkanCommandPool* owner, const bool isPrimary ) {
-        _handle = handle;
+        Handle = handle;
         _owner = owner;
         _isPrimary = isPrimary;
         _state = CommandBufferState::Ready;
     }
 
     VulkanCommandBuffer::~VulkanCommandBuffer() {
-        _handle = nullptr;
+        Handle = nullptr;
         _owner = nullptr;
         _isPrimary = false;
         _state = CommandBufferState::NotAllocated;
+
+        if( _waitFlags ) {
+            TMemory::Free( _waitFlags );
+            _waitFlags = nullptr;
+        }
+        _waitFlagAllocatedCount = 0;
+        _waitFlagCount = 0;
+
+        if( _waitSemaphores ) {
+            TMemory::Free( _waitSemaphores );
+            _waitSemaphores = nullptr;
+        }
+        _waitSemaphoreAllocatedCount = 0;
+        _waitSemaphoreCount = 0;
     }
 
     void VulkanCommandBuffer::Begin( const bool isSingleUse, const bool isRenderPassContinue, const bool isSimultaneousUse ) {
@@ -36,13 +53,13 @@ namespace Epoch {
         }
         beginInfo.pInheritanceInfo = nullptr;
 
-        VK_CHECK( vkBeginCommandBuffer( _handle, &beginInfo ) );
+        VK_CHECK( vkBeginCommandBuffer( Handle, &beginInfo ) );
 
         _state = CommandBufferState::Recording;
     }
 
     void VulkanCommandBuffer::End() {
-        VK_CHECK( vkEndCommandBuffer( _handle ) );
+        VK_CHECK( vkEndCommandBuffer( Handle ) );
         _state = CommandBufferState::RecordingEnded;
     }
 
@@ -58,19 +75,41 @@ namespace Epoch {
     }
 
     void VulkanCommandBuffer::AddWaitSemaphore( VkPipelineStageFlags waitFlags, VulkanSemaphore* waitSemaphore ) {
-        _waitFlags.push_back( waitFlags );
-        _waitSemaphores.push_back( waitSemaphore );
+
+        // Wait flags - Allocate more space if need be.
+        if( _waitFlagAllocatedCount <= _waitFlagCount ) {
+            VkPipelineStageFlags* temp = static_cast<VkPipelineStageFlags*>( TMemory::Allocate( sizeof( VkPipelineStageFlags ) * ( _waitFlagCount + 1 ) ) );
+            if( _waitFlags ) {
+                TMemory::Memcpy( temp, _waitFlags, _waitFlagCount );
+                TMemory::Free( _waitFlags );
+            }
+            _waitFlags = temp;
+            _waitFlagAllocatedCount++;
+        }
+        _waitFlags[_waitFlagCount] = waitFlags;
+        _waitFlagCount++;
+
+        // Wait semaphores - Allocate more space if need be.
+        if( _waitSemaphoreAllocatedCount <= _waitSemaphoreCount ) {
+            VulkanSemaphore** temp = static_cast<VulkanSemaphore**>( TMemory::Allocate( sizeof( VulkanSemaphore* ) * ( _waitSemaphoreCount + 1 ) ) );
+            if( _waitSemaphores ) {
+                TMemory::Memcpy( temp, _waitSemaphores, _waitSemaphoreCount );
+                TMemory::Free( _waitSemaphores );
+            }
+            _waitSemaphores = temp;
+            _waitSemaphoreAllocatedCount++;
+        }
+        _waitSemaphores[_waitSemaphoreCount] = waitSemaphore;
+        _waitSemaphoreCount++;
     }
 
     void VulkanCommandBuffer::UpdateSubmitted() {
-        _submittedWaitSemaphores = _waitSemaphores;
-        _waitSemaphores.clear();
-        _waitFlags.clear();
+        _waitSemaphoreCount = 0;
+        _waitFlagCount = 0;
     }
 
     void VulkanCommandBuffer::Reset() {
-        _waitFlags.clear();
-        _waitSemaphores.clear();
-        _submittedWaitSemaphores.clear();
+        _waitSemaphoreCount = 0;
+        _waitFlagCount = 0;
     }
 }

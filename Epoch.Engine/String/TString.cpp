@@ -212,6 +212,115 @@ namespace Epoch {
         buildDefault();
     }
 
+    void TString::Fill( const char fillChar, const U32 length ) {
+        ensureAllocated( length + 1 );
+        for( U32 i = 0; i < length; ++i ) {
+            _data[i] = fillChar;
+        }
+        _data[length] = '\0';
+    }
+
+    void TString::Truncate( const U32 length ) {
+        if( length >= _length ) {
+            return;
+        }
+
+        _data[length] = '\0';
+        _length = length;
+    }
+
+    TString TString::Left( const U32 length ) const {
+        return Mid( 0, length );
+    }
+
+    TString TString::Right( const U32 length ) const {
+        if( _length <= length ) {
+            return *this;
+        }
+        return Mid( _length - length, length );
+    }
+
+    TString TString::Mid( const U32 start, const U32 length ) const {
+        if( _length == 0 || start >= _length ) {
+            return "";
+        }
+
+        U32 newLength = length;
+        if( start + length >= _length ) {
+            newLength = _length - start;
+        }
+
+        TString result = "";
+        result.Append( &_data[start], newLength );
+        return result;
+    }
+
+    TString& TString::StripFilename() {
+        I32 position = _length - 1;
+        while( ( position > 0 ) && ( ( *this )[position] != '/' ) && ( ( *this )[position] ) != '\\' ) {
+            --position;
+        }
+
+        if( position < 0 ) {
+            position = 0;
+        }
+
+        Truncate( position );
+        return *this;
+    }
+
+    TString& TString::StripPath() {
+        I32 position = _length;
+        while( ( position > 0 ) && ( ( *this )[position - 1] != '/' ) && ( ( *this )[position - 1] ) != '\\' ) {
+            --position;
+        }
+
+        *this = Right( _length - position );
+        return *this;
+    }
+
+    TString& TString::StripFileExtension() {
+        for( U32 i = _length - 1; i >= 0; --i ) {
+            if( _data[i] == '.' ) {
+                _data[i] = '\0';
+                _length = i;
+                break;
+            }
+        }
+        return *this;
+    }
+
+    TString TString::ExtractFilename() const {
+        I32 position = _length - 1;
+        while( ( position > 0 ) && ( ( *this )[position - 1] != '/' ) && ( ( *this )[position - 1] ) != '\\' ) {
+            --position;
+        }
+
+        return Right( _length - position );
+    }
+
+    TString TString::ExtractFilePath() const {
+        I32 position = _length;
+        while( ( position > 0 ) && ( ( *this )[position - 1] != '/' ) && ( ( *this )[position - 1] ) != '\\' ) {
+            --position;
+        }
+
+        return Left( position );
+    }
+
+    TString TString::ExtractFileExtension() const {
+        I32 position = _length - 1;
+        while( ( position > 0 ) && ( ( *this )[position - 1] != '.' ) ) {
+            --position;
+        }
+
+        if( !position ) {
+            return "";
+        } else {
+            return Right( _length - position );
+        }
+    }
+
     TString TString::Format( const char* format, ... ) {
         TString result;
         va_list args;
@@ -254,7 +363,10 @@ namespace Epoch {
     }
 
     void TString::ensureAllocated( const U32 size, const bool keepData ) {
-        if( size > _allocated ) {
+        // In MSVC, 0xCDCDCDCD is a special fill pattern used to identify uninitialized variables. This
+        // can help detect that a string needs to be initialized, such as being part of an array.
+        // TODO: find a better way to detect this that is cross-compiler compatible.
+        if( size > _allocated || _allocated == 0xCDCDCDCD ) {
             reallocate( size, keepData );
         }
     }

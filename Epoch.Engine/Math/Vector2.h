@@ -3,13 +3,14 @@
 #include <xhash>
 
 #include "../Types.h"
+#include "../Defines.h"
 
 namespace Epoch {
 
     /*
      * Represents a 3-dimensional vector in space which includes X, Y and Z components.
      */
-    struct Vector2 {
+    struct EPOCH_API Vector2 {
     public:
 
         /** The X-component of this vector. */

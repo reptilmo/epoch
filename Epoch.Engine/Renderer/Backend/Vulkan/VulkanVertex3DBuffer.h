@@ -13,8 +13,6 @@ namespace Epoch {
         VulkanVertex3DBuffer( VulkanDevice* device );
         ~VulkanVertex3DBuffer();
 
-        void SetData( std::vector<Vertex3D> data );
-
         /**
          * Binds this buffer using the given offset.
          *

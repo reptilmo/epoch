@@ -105,7 +105,7 @@ namespace Epoch {
         }
 
         vkCmdPipelineBarrier(
-            commandBuffer->GetHandle(),
+            commandBuffer->Handle,
             sourceStage, destinationStage,
             0,
             0, nullptr,
@@ -137,7 +137,7 @@ namespace Epoch {
         };
 
         vkCmdCopyBufferToImage(
-            commandBuffer->GetHandle(),
+            commandBuffer->Handle,
             buffer,
             _imageHandle,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

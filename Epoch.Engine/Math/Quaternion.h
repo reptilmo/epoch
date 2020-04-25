@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Defines.h"
 #include "Vector3.h"
 
 namespace Epoch {
@@ -11,7 +12,7 @@ namespace Epoch {
     /*
      * Floating point quaternion that represents a rotation about an axis in 3D space.
      */
-    struct Quaternion {
+    struct EPOCH_API Quaternion {
     public:
 
         /** The X-component. */
@@ -176,7 +177,7 @@ namespace Epoch {
          *
          * @returns A new rotation matrix.
          */
-        Matrix4x4 ToMatrix4x4() const;
+        void ToMatrix4x4( Matrix4x4* quatMatrix ) const;
 
         /**
          * Calculates a rotation matrix based on this quaternion and the passed in center point.

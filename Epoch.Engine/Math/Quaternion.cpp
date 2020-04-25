@@ -122,34 +122,31 @@ namespace Epoch {
         return Quaternion( X / s, Y / s, Z / s, W / s );
     }
 
-    Matrix4x4 Quaternion::ToMatrix4x4() const {
+    void Quaternion::ToMatrix4x4( Matrix4x4* quatMatrix ) const {
 
         // https://stackoverflow.com/questions/1556260/convert-quaternion-rotation-to-rotation-matrix
         Quaternion q = *this;
         q.Normalize();
 
-        Matrix4x4 m;
-        ( *m[0] ) = 1.0f - 2.0f * Y * Y - 2.0f * Z * Z;
-        ( *m[1] ) = 2.0f * X * Y - 2.0f * Z * W;
-        ( *m[2] ) = 2.0f * X * Z + 2.0f * Y * W;
-        ( *m[3] ) = 0.0f;
+        quatMatrix->_data[0] = 1.0f - 2.0f * Y * Y - 2.0f * Z * Z;
+        quatMatrix->_data[1] = 2.0f * X * Y - 2.0f * Z * W;
+        quatMatrix->_data[2] = 2.0f * X * Z + 2.0f * Y * W;
+        //m[3] = 0.0f;
 
-        ( *m[4] ) = 2.0f * X * Y + 2.0f * Z * W;
-        ( *m[5] ) = 1.0f - 2.0f * X * X - 2.0f * Z * Z;
-        ( *m[6] ) = 2.0f * Y * Z - 2.0f * X * W;
-        ( *m[7] ) = 0.0f;
+        quatMatrix->_data[4] = 2.0f * X * Y + 2.0f * Z * W;
+        quatMatrix->_data[5] = 1.0f - 2.0f * X * X - 2.0f * Z * Z;
+        quatMatrix->_data[6] = 2.0f * Y * Z - 2.0f * X * W;
+        //m[7] = 0.0f;
 
-        ( *m[8] ) = 2.0f * X * Z - 2.0f * Y * W;
-        ( *m[9] ) = 2.0f * Y * Z + 2.0f * X * W;
-        ( *m[10] ) = 1.0f - 2.0f * X * X - 2.0f * Y * Y;
-        ( *m[11] ) = 0.0f;
+        quatMatrix->_data[8] = 2.0f * X * Z - 2.0f * Y * W;
+        quatMatrix->_data[9] = 2.0f * Y * Z + 2.0f * X * W;
+        quatMatrix->_data[10] = 1.0f - 2.0f * X * X - 2.0f * Y * Y;
+        //m[11] = 0.0f;
 
-        ( *m[12] ) = 0.0f;
-        ( *m[13] ) = 0.0f;
-        ( *m[14] ) = 0.0f;
-        ( *m[15] ) = 1.0f;
-
-        return m;
+        /*m[12] = 0.0f;
+        m[13] = 0.0f;
+        m[14] = 0.0f;
+        m[15] = 1.0f;*/
     }
 
     Vector4 Quaternion::ToVector4() const {
@@ -157,6 +154,7 @@ namespace Epoch {
     }
 
     Matrix4x4 Quaternion::Rotation( const Vector3& center ) const {
+        // TODO: This is a *lot* of copy operations. Trim this down.
         float sqw = W * W;
         float sqx = X * X;
         float sqy = Y * Y;
@@ -194,25 +192,25 @@ namespace Epoch {
 
         // NOTE: Might have these backwards.
         Matrix4x4 m;
-        ( *m[0] ) = m00;
-        ( *m[1] ) = m01;
-        ( *m[2] ) = m02;
-        ( *m[3] ) = m03;
-
-        ( *m[4] ) = m10;
-        ( *m[5] ) = m11;
-        ( *m[6] ) = m12;
-        ( *m[7] ) = m13;
-
-        ( *m[8] ) = m20;
-        ( *m[9] ) = m21;
-        ( *m[10] ) = m22;
-        ( *m[11] ) = m23;
-
-        ( *m[12] ) = m30;
-        ( *m[13] ) = m31;
-        ( *m[14] ) = m32;
-        ( *m[15] ) = m33;
+        m._data[0] = m00;
+        m._data[1] = m01;
+        m._data[2] = m02;
+        m._data[3] = m03;
+         
+        m._data[4] = m10;
+        m._data[5] = m11;
+        m._data[6] = m12;
+        m._data[7] = m13;
+         
+        m._data[8] = m20;
+        m._data[9] = m21;
+        m._data[10] = m22;
+        m._data[11] = m23;
+         
+        m._data[12] = m30;
+        m._data[13] = m31;
+        m._data[14] = m32;
+        m._data[15] = m33;
         return m;
     }
 
@@ -292,7 +290,7 @@ namespace Epoch {
 
         const float half_a = 0.5f * angle;
         float s, c;
-        TMath::SinCos( half_a ,s, c );
+        TMath::SinCos( half_a, s, c );
 
         q.X = s * axis.X;
         q.Y = s * axis.Y;

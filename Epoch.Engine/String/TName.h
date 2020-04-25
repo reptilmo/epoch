@@ -1,11 +1,12 @@
 #pragma once
 
+#include "../Defines.h"
 
 namespace Epoch {
 
     class TString;
 
-    class TName {
+    class EPOCH_API TName {
     public:
         TName( const TString& str );
 
@@ -13,7 +14,7 @@ namespace Epoch {
         //static const TName& Find( const TString& str );
     };
 
-    class TNamePool {
+    class EPOCH_API TNamePool {
     public:
         static void InitializeTemp();
         TNamePool();

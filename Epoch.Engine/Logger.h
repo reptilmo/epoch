@@ -1,11 +1,13 @@
 #pragma once
 
+#include "Defines.h"
+
 namespace Epoch {
 
     /**
      * Represents the logger system for this engine.
      */
-    class Logger final {
+    class EPOCH_API Logger final {
     public:
 
         /**

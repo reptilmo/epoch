@@ -12,8 +12,6 @@ namespace Epoch {
         VulkanIndexBuffer( VulkanDevice* device );
         ~VulkanIndexBuffer();
 
-        void SetData( std::vector<U32> data );
-
         /**
          * Binds this buffer using the given offset.
          *

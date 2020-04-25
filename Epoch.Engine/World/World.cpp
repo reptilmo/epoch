@@ -1,20 +1,44 @@
 
-
+#include "Entity.h"
+#include "Level.h"
 #include "World.h"
+
 
 namespace Epoch {
 
-    U32 WObject::GLOBAL_OBJECT_ID = 0;
 
-    WObject::WObject() {
-
-        // Obtain a global unique ID.
-        _id = WObject::GLOBAL_OBJECT_ID++;
+    World::World() {
+        _rootLevel = new Level();
+        _rootLevel->Name = "__ROOT__";
+        _rootLevel->Load();
     }
 
-    WObject::~WObject() {
+    World::~World() {
+        if( _rootLevel ) {
+            _rootLevel->Unload();
+            delete _rootLevel;
+            _rootLevel = nullptr;
+        }
+    }
 
-        // Intentionally wrap around to U32_MAX
-        _id = -1;
+    void World::Update( const F32 deltaTime ) {
+        if( _rootLevel ) {
+            _rootLevel->Update( deltaTime );
+        }
+    }
+
+    WorldRenderableObjectTable* World::GetRenderableObjects() {
+        if( !_objectTable ) {
+            _objectTable = new WorldRenderableObjectTable();
+        }
+
+        // Reset counts
+        _objectTable->StaticMeshCount = 0;        
+
+        if( _rootLevel ) {
+            _rootLevel->AddRenderablesToTable( &_objectTable );
+        } 
+
+        return _objectTable;
     }
 }

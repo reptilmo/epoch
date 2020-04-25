@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <map>
 #include <vulkan/vulkan.h>
 
@@ -10,6 +9,7 @@
 #include "../../../Logger.h"
 #include "../../../Defines.h"
 #include "../../../Memory/Memory.h"
+#include "../../../Containers/List.h"
 #include "../../../Containers/LinkedList.h"
 
 namespace Epoch {
@@ -96,7 +96,7 @@ namespace Epoch {
          *
          * @data The data to be set.
          */
-        virtual void SetData( const std::vector<T>& data );
+        virtual void SetData( const List<T>& data );
 
         /**
          * Allocates internal buffers. This is destructive to any that may already exist, which are
@@ -113,7 +113,7 @@ namespace Epoch {
          *
          * @ returns A const pointer to the allocated data block.
          */
-        virtual VulkanBufferDataBlock* AllocateData( const std::vector<T>& data );
+        virtual VulkanBufferDataBlock* AllocateData( const List<T>& data );
 
         /**
          * Sets data in the buffer starting at the offset.
@@ -123,7 +123,7 @@ namespace Epoch {
          *
          * @ returns An allocation index to be referenced during rendering and freeing.
          */
-        virtual const U64 SetDataRange( const std::vector<T>& data, U64 offset );
+        virtual const U64 SetDataRange( const List<T>& data, U64 offset );
 
         /**
          * Retrieves the buffer offset and range for a given index.
@@ -175,10 +175,10 @@ namespace Epoch {
     };
 
     template <class T>
-    void VulkanBuffer<T>::SetData( const std::vector<T>& data ) {
-        ASSERT( data.size() > 0 );
+    void VulkanBuffer<T>::SetData( const List<T>& data ) {
+        ASSERT( data.Size() > 0 );
 
-        VkDeviceSize bufferSize = sizeof( data[0] ) * data.size();
+        VkDeviceSize bufferSize = sizeof( data[0] ) * data.Size();
 
         // Create a host-visible staging buffer to upload to. Mark it as the source of the transfer.
         VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -186,7 +186,7 @@ namespace Epoch {
 
         // Lock, copy, unlock
         void* pData = staging.LockMemory( 0, bufferSize, 0 );
-        TMemory::Memcpy( pData, data.data(), bufferSize );
+        TMemory::Memcpy( pData, data.Data(), bufferSize );
         staging.UnlockMemory();
 
         // Setup a device-local buffer as the actual buffer. Data will be copied to this from the staging buffer. Mark it as
@@ -228,12 +228,12 @@ namespace Epoch {
     }
 
     template <class T>
-    VulkanBufferDataBlock* VulkanBuffer<T>::AllocateData( const std::vector<T>& data ) {
+    VulkanBufferDataBlock* VulkanBuffer<T>::AllocateData( const List<T>& data ) {
 
-        ASSERT( data.size() > 0 );
+        ASSERT( data.Size() > 0 );
 
         VulkanBufferDataBlock* dataBlock = new VulkanBufferDataBlock();
-        dataBlock->ElementCount = (U32)data.size();
+        dataBlock->ElementCount = data.Size();
         dataBlock->ElementSize = sizeof( data[0] );
         dataBlock->BlockSize = dataBlock->ElementSize * dataBlock->ElementCount;
         dataBlock->Allocated = true;
@@ -299,7 +299,7 @@ namespace Epoch {
 
         // Lock, copy, unlock
         void* pData = staging.LockMemory( 0, dataBlock->BlockSize, 0 );
-        TMemory::Memcpy( pData, data.data(), dataBlock->BlockSize );
+        TMemory::Memcpy( pData, data.Data(), dataBlock->BlockSize );
         staging.UnlockMemory();
 
         // Perform the copy from staging to the device local buffer.
@@ -309,12 +309,12 @@ namespace Epoch {
     }
 
     template <class T>
-    const U64 VulkanBuffer<T>::SetDataRange( const std::vector<T>& data, U64 offset ) {
+    const U64 VulkanBuffer<T>::SetDataRange( const List<T>& data, U64 offset ) {
 
-        ASSERT( data.size() > 0 );
+        ASSERT( data.Size() > 0 );
 
         VulkanBufferDataBlock* dataBlock = new VulkanBufferDataBlock();
-        dataBlock->ElementCount = (U32)data.size();
+        dataBlock->ElementCount = (U32)data.Size();
         dataBlock->ElementSize = sizeof( data[0] );
         dataBlock->BlockSize = dataBlock->ElementSize * dataBlock->ElementCount;
         dataBlock->Allocated = true;
@@ -368,7 +368,7 @@ namespace Epoch {
             }
         }
 
-        VkDeviceSize dataSize = sizeof( data[0] ) * data.size();
+        VkDeviceSize dataSize = sizeof( data[0] ) * data.Size();
         ASSERT_MSG( offset + dataSize <= _totalSize, "Buffer does not have enough room for data to be added." );
 
         // Create a host-visible staging buffer to upload to. Mark it as the source of the transfer.
@@ -377,7 +377,7 @@ namespace Epoch {
 
         // Lock, copy, unlock
         void* pData = staging.LockMemory( 0, dataSize, 0 );
-        TMemory::Memcpy( pData, data.data(), dataSize );
+        TMemory::Memcpy( pData, data.Data(), dataSize );
         staging.UnlockMemory();
 
         // Perform the copy from staging to the device local buffer.

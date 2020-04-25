@@ -11,7 +11,7 @@ namespace Epoch {
         X = Y = Z = 0;
     }
 
-    Vector3::Vector3( const float xyz ) {
+    Vector3::Vector3( const F32 xyz ) {
         X = xyz;
         Y = xyz;
         Z = xyz;
@@ -23,22 +23,22 @@ namespace Epoch {
         Z = other.Z;
     }
 
-    Vector3::Vector3( const float x, const float y, const float z ) {
+    Vector3::Vector3( const F32 x, const F32 y, const F32 z ) {
         X = x;
         Y = y;
         Z = z;
     }
 
-    float Vector3::Length() const {
+    F32 Vector3::Length() const {
         return TMath::SquareRoot( LengthSquared() );
     }
 
-    float Vector3::LengthSquared() const {
+    F32 Vector3::LengthSquared() const {
         return ( X * X + Y * Y + Z * Z );
     }
 
     Vector3 Vector3::Normalize() {
-        const float length = Length();
+        const F32 length = Length();
         if( length != 0.0f ) {
             X /= length;
             Y /= length;
@@ -54,15 +54,15 @@ namespace Epoch {
         return *this;
     }
 
-    float Vector3::Dot( const Vector3& other ) const {
-        float p = 0;
+    F32 Vector3::Dot( const Vector3& other ) const {
+        F32 p = 0;
         p += X * other.X;
         p += Y * other.Y;
         p += Z * other.Z;
         return p;
     }
 
-    void Vector3::Set( const float x, const float y, const float z ) {
+    void Vector3::Set( const F32 x, const F32 y, const F32 z ) {
         X = x;
         Y = y;
         Z = z;
@@ -72,7 +72,7 @@ namespace Epoch {
         return StringUtilities::Format( "%f %f %f", X, Y, Z );
     }
 
-    const bool Vector3::Compare( const Vector3& v, const float tolerance ) const {
+    const bool Vector3::Compare( const Vector3& v, const F32 tolerance ) const {
         if( TMath::Abs( X - v.X ) > tolerance ) {
             return false;
         }
@@ -95,11 +95,11 @@ namespace Epoch {
         return *this;
     }
 
-    Vector3 Vector3::operator*( const float& scalar ) const {
+    Vector3 Vector3::operator*( const F32& scalar ) const {
         return Vector3( X * scalar, Y * scalar, Z * scalar );
     }
 
-    Vector3 Vector3::operator/( const float& scalar ) const {
+    Vector3 Vector3::operator/( const F32& scalar ) const {
         return Vector3( X / scalar, Y / scalar, Z / scalar );
     }
 
@@ -155,12 +155,12 @@ namespace Epoch {
         return X != v.X && Y != v.Y && Z != v.Z;
     }
 
-    float& Vector3::operator[]( I32 index ) {
+    F32& Vector3::operator[]( I32 index ) {
         ASSERT_MSG( index < 3 && index >= 0, "Vector 3 index out of bounds" );
         return ( &X )[index];
     }
 
-    float Vector3::operator[]( I32 index ) const {
+    F32 Vector3::operator[]( I32 index ) const {
         ASSERT_MSG( index < 3 && index >= 0, "Vector 3 index out of bounds" );
         return ( &X )[index];
     }
@@ -202,7 +202,7 @@ namespace Epoch {
         return Vector3( 0, 0, -1 );
     }
 
-    float Vector3::Distance( const Vector3& a, const Vector3& b ) {
+    F32 Vector3::Distance( const Vector3& a, const Vector3& b ) {
         Vector3 d = a - b;
         return d.Length();
     }

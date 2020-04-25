@@ -8,7 +8,7 @@ namespace Epoch {
     /**
      * A homogeneous 4-dimensional vector. 16-bit aligned.
      */
-    ALIGN( 16 ) struct Vector4 {
+    ALIGN( 16 ) struct EPOCH_API Vector4 {
     public:
 
         /** The X-component of this vector. */

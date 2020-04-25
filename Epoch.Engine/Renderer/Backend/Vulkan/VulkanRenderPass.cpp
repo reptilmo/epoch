@@ -176,10 +176,10 @@ namespace Epoch {
         renderPassBeginInfo.clearValueCount = 2;
         renderPassBeginInfo.pClearValues = clearValues;
 
-        vkCmdBeginRenderPass( commandBuffer->GetHandle(), &renderPassBeginInfo, VkSubpassContents::VK_SUBPASS_CONTENTS_INLINE );
+        vkCmdBeginRenderPass( commandBuffer->Handle, &renderPassBeginInfo, VkSubpassContents::VK_SUBPASS_CONTENTS_INLINE );
     }
 
     void VulkanRenderPass::End( VulkanCommandBuffer* commandBuffer ) {
-        vkCmdEndRenderPass( commandBuffer->GetHandle() );
+        vkCmdEndRenderPass( commandBuffer->Handle );
     }
 }

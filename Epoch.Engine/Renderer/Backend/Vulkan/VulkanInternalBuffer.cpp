@@ -79,7 +79,7 @@ namespace Epoch {
         copyRegion.srcOffset = sourceOffset;
         copyRegion.dstOffset = destinationOffset;
         copyRegion.size = size;
-        vkCmdCopyBuffer( commandBuffer->GetHandle(), _handle, other->_handle, 1, &copyRegion );
+        vkCmdCopyBuffer( commandBuffer->Handle, _handle, other->_handle, 1, &copyRegion );
 
         _device->EndSingleUseCommandBuffer( commandBuffer );
     }
@@ -95,7 +95,7 @@ namespace Epoch {
         copyRegion.srcOffset = sourceOffset;
         copyRegion.dstOffset = destinationOffset;
         copyRegion.size = size;
-        vkCmdCopyBuffer( commandBuffer->GetHandle(), other->_handle, _handle, 1, &copyRegion );
+        vkCmdCopyBuffer( commandBuffer->Handle, other->_handle, _handle, 1, &copyRegion );
 
         _device->EndSingleUseCommandBuffer( commandBuffer );
     }

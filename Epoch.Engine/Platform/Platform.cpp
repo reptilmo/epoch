@@ -18,6 +18,15 @@ namespace Epoch {
         return new TGLFWWindow( applicationName, width, height );
     }
 
+    // stop-gap until platform layer is replaced
+    U32 Platform::Cycles() {
+        return 0;
+    }
+
+    U64 Platform::Cycles64() {
+        return 0;
+    }
+
     Platform::Platform( Engine* engine, const char* applicationName ) {
         Logger::Trace( "Initializing platform layer..." );
         _engine = engine;
@@ -64,7 +73,7 @@ namespace Epoch {
             if( !glfwWindowShouldClose( _window ) ) {
                 U64 currentTime = _clock->GetTime();
                 F32 delta = (F32)( (F64)currentTime - (F64)_lastTime );
-                delta *= 0.001; // Convert to seconds.
+                delta *= 0.001f; // Convert to seconds.
                 if( !_engine->OnLoop( delta ) ) {
                     Logger::Fatal( "Engine loop failed! See logs for details." );
                 }

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../../Types.h"
-#include "../MeshData.h"
+#include "../../World/EntityComponents/StaticMeshEntityComponent.h"
+#include "../../World/World.h"
 
 namespace Epoch {
 
@@ -9,6 +10,7 @@ namespace Epoch {
     class TString;
     class ITexture;
     class IShader;
+    struct WorldRenderableObjectTable;
 
     /**
      * Represents the backend of the renderer, which is an abstraction of the
@@ -67,21 +69,16 @@ namespace Epoch {
          * 
          * @returns True if successful; otherwise false.
          */
-        virtual const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) = 0;
+        virtual const bool UploadMeshData( const MeshUploadData& data, StaticMeshRenderReferenceData* referenceData ) = 0;
 
         /**
          * Frees mesh data using the provided reference data. 
          *
          * @param referenceData A pointer to the reference data object whose data should be released.
          */
-        virtual void FreeMeshData( MeshRendererReferenceData* referenceData ) = 0;
+        virtual void FreeMeshData( StaticMeshRenderReferenceData* referenceData ) = 0;
 
-        /**
-         * Adds the object referenced by the provided reference data to a list of objects to be rendered in the next frame.
-         * 
-         * @param referenceData A pointer to the reference data object to be rendered.
-         */
-        virtual void AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) = 0;
+        virtual void SetRenderTable( WorldRenderableObjectTable* renderTable ) = 0;
 
         /**
          * Returns a new texture from this renderer. This is always a creation request, as the front end

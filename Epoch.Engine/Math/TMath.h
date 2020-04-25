@@ -237,6 +237,12 @@ namespace Epoch {
         // Converts radians to degrees.
         static F32 RadToDeg( const F32 radians );
 
+        static FORCEINLINE I32 Random() { return rand(); }
+        static FORCEINLINE F32 FloatRandom() { return Random() / (F32)RAND_MAX; }
+        static FORCEINLINE F32 FloatRandomRange( F32 min, F32 max ) {
+            return min + ( max - min ) * FloatRandom();
+        }
+
     public:
         // Constants
 

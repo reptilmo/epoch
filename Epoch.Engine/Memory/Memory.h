@@ -12,8 +12,16 @@ namespace Epoch {
             return malloc( size );
         }
 
+        static FORCEINLINE void* AllocateAligned( const U64 size, const U64 alignment ) {
+            return _aligned_malloc( size, alignment );
+        }
+
         static FORCEINLINE void Free( void* block ) {
             free( block );
+        }
+
+        static FORCEINLINE void FreeAligned( void* block ) {
+            _aligned_free( block );
         }
 
         static FORCEINLINE void* Memcpy( void* destination, const void* source, U64 size ) {

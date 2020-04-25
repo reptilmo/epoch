@@ -26,10 +26,12 @@
 
 // Memory alignment.
 #define ALIGN(n) __declspec(align(n))
-#ifdef Epoch_BUILD_LIB
-#define Epoch_API __declspec(dllexport)
+#ifdef EPOCH_BUILD_LIB
+#define EPOCH_API __declspec(dllexport)
+#define EPOCH_EXPORT __declspec(dllexport)
 #else
-#define Epoch_API __declspec(dllimport)
+#define EPOCH_API __declspec(dllimport)
+#define EPOCH_EXPORT 
 #endif
 #elif PLATFORM_LINUX || PLATFORM_MAC
 #define FORCEINLINE inline

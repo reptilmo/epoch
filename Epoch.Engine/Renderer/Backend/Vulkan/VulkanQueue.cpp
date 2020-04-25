@@ -1,4 +1,5 @@
 
+#include "../../../Memory/Memory.h"
 #include "VulkanDevice.h"
 #include "VulkanFence.h"
 #include "VulkanSemaphore.h"
@@ -32,28 +33,29 @@ namespace Epoch {
 
         // Command buffer
         submitInfo.commandBufferCount = 1;
-        VkCommandBuffer buffers[1] = { commandBuffer->GetHandle() };
-        submitInfo.pCommandBuffers = buffers;
+        submitInfo.pCommandBuffers = &commandBuffer->Handle;
 
         // Signal semaphores
         submitInfo.signalSemaphoreCount = signalSemaphoreCount;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
         // Wait semaphores
-        std::vector<VkSemaphore> waitSemaphores;
-        U32 waitSemaphoreCount = (U32)commandBuffer->GetWaitSemaphores().size();
+        U32 waitSemaphoreCount = commandBuffer->GetWaitSemaphoreCount();
+        VkSemaphore* waitSemaphoreHandles = static_cast<VkSemaphore*>( TMemory::Allocate( sizeof( VkSemaphore ) * waitSemaphoreCount ) );
         if( waitSemaphoreCount > 0 ) {
-            waitSemaphores.clear();
-            for( auto semaphore : commandBuffer->GetWaitSemaphores() ) {
-                waitSemaphores.push_back( semaphore->GetHandle() );
+            for( U32 i = 0; i < waitSemaphoreCount; ++i ) {
+                waitSemaphoreHandles[i] = commandBuffer->GetWaitSemaphore( i )->Handle;
             }
 
             submitInfo.waitSemaphoreCount = waitSemaphoreCount;
-            submitInfo.pWaitSemaphores = waitSemaphores.data();
-            submitInfo.pWaitDstStageMask = commandBuffer->GetWaitFlags().data();
+            submitInfo.pWaitSemaphores = waitSemaphoreHandles;
+            submitInfo.pWaitDstStageMask = commandBuffer->GetWaitFlags();
         }
 
-        VK_CHECK( vkQueueSubmit( _handle, 1, &submitInfo, f ) );
+        VkResult result = vkQueueSubmit( _handle, 1, &submitInfo, f );
+        VK_CHECK( result );
+
+        TMemory::Free( waitSemaphoreHandles );
 
         commandBuffer->_state = CommandBufferState::Submitted;
         commandBuffer->UpdateSubmitted();

@@ -45,7 +45,7 @@ namespace Epoch {
         if( fence ) {
             fenceHandle = fence->GetHandle();
         }
-        VkResult result = vkAcquireNextImageKHR( _device->LogicalDevice, _handle, timeoutNS, imageAvailableSemaphore->GetHandle(), fenceHandle, imageIndex );
+        VkResult result = vkAcquireNextImageKHR( _device->LogicalDevice, _handle, timeoutNS, imageAvailableSemaphore->Handle, fenceHandle, imageIndex );
         if( result == VkResult::VK_ERROR_OUT_OF_DATE_KHR ) {
             // Trigger swapchain recreation, then boot out of the render loop.
             Extent2D extent = _device->FramebufferSize;
@@ -64,10 +64,9 @@ namespace Epoch {
     void VulkanSwapchain::Present( VulkanQueue* graphicsQueue, VulkanQueue* presentQueue, VulkanSemaphore* renderCompleteSemaphore, const U32 presentImageIndex ) {
 
         // Return the image to the swapchain for presentation
-        VkSemaphore renderCompleteSem = renderCompleteSemaphore->GetHandle();
         VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &renderCompleteSem;
+        presentInfo.pWaitSemaphores = &renderCompleteSemaphore->Handle;
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &_handle;
         presentInfo.pImageIndices = &presentImageIndex;

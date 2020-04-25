@@ -2,6 +2,7 @@
 
 #include <xhash>
 
+#include "../Defines.h"
 #include "../Types.h"
 
 namespace Epoch {
@@ -9,17 +10,17 @@ namespace Epoch {
     /*
      * Represents a 3-dimensional vector in space which includes X, Y and Z components.
      */
-    struct Vector3 {
+    struct EPOCH_API Vector3 {
     public:
 
         /** The X-component of this vector. */
-        float X;
+        F32 X;
 
         /** The Y-component of this vector. */
-        float Y;
+        F32 Y;
 
         /** The Z-component of this vector. */
-        float Z;
+        F32 Z;
 
     public:
 
@@ -33,7 +34,7 @@ namespace Epoch {
          *
          * @param xyz The value to set the X-, Y- and Z-components to.
          */
-        Vector3( const float xyz );
+        Vector3( const F32 xyz );
 
         /**
          * Creates a new Vector3 with values copied from the one provided.
@@ -49,7 +50,7 @@ namespace Epoch {
          * @param y The value to set the Y-component to.
          * @param z The value to set the Z-component to.
          */
-        Vector3( const float x, const float y, const float z );
+        Vector3( const F32 x, const F32 y, const F32 z );
 
     public:
 
@@ -58,14 +59,14 @@ namespace Epoch {
          *
          * @return Vector length.
          */
-        float Length() const;
+        F32 Length() const;
 
         /**
          * Gets the squared length (magnitude) of this vector.
          *
          * @return Squared vector length.
          */
-        float LengthSquared() const;
+        F32 LengthSquared() const;
 
         /**
          * Normalizes this vector.
@@ -89,7 +90,7 @@ namespace Epoch {
          * @param other The other vector to calculate against.
          * @return The calculated dot product.
          */
-        float Dot( const Vector3& other ) const;
+        F32 Dot( const Vector3& other ) const;
 
         /**
          * Sets the values of this vector.
@@ -98,7 +99,7 @@ namespace Epoch {
          * @param y The value to set the Y-component of this vector to.
          * @param z The value to set the Z-component of this vector to.
          */
-        void Set( const float x, const float y, const float z );
+        void Set( const F32 x, const F32 y, const F32 z );
 
         /**
          * Outputs this vector to a string, separated by a space.
@@ -114,7 +115,7 @@ namespace Epoch {
          *
          * @return true if the same; otherwise false.
          */
-        const bool Compare( const Vector3& v, const float tolerance ) const;
+        const bool Compare( const Vector3& v, const F32 tolerance ) const;
 
         /**
          * Assigns the elements in this vector to the values of that passed in.
@@ -132,7 +133,7 @@ namespace Epoch {
          *
          * @returns A copy of the multiplied vector.
          */
-        Vector3 operator*( const float& scalar ) const;
+        Vector3 operator*( const F32& scalar ) const;
 
         /**
          * Divides the elements in this vector by the scalar passed in.
@@ -141,7 +142,7 @@ namespace Epoch {
          *
          * @returns A copy of the divided vector.
          */
-        Vector3 operator/( const float& scalar ) const;
+        Vector3 operator/( const F32& scalar ) const;
 
         /**
          * Multiplies the elements in this vector by the values of the vector passed in.
@@ -240,7 +241,7 @@ namespace Epoch {
          *
          * @return A reference to the component.
          */
-        float& operator[]( I32 index );
+        F32& operator[]( I32 index );
 
         /**
          * Gets a specific component of this vector.
@@ -249,7 +250,7 @@ namespace Epoch {
          *
          * @return A copy of the component.
          */
-        float operator[]( I32 index ) const;
+        F32 operator[]( I32 index ) const;
 
     public:
 
@@ -285,7 +286,7 @@ namespace Epoch {
          *
          * @return The distance.
          */
-        static float Distance( const Vector3& a, const Vector3& b );
+        static F32 Distance( const Vector3& a, const Vector3& b );
 
         /**
          * Returns a normalized version of the supplied vector.

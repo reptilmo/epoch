@@ -19,7 +19,7 @@ namespace Epoch {
     /**
      * A custom string class which is used to represent strings throughout the system.
      */
-    class TString {
+    class EPOCH_API TString {
     public:
         TString();
         TString( const char* str );
@@ -59,6 +59,19 @@ namespace Epoch {
         void Append( const char* str, U64 length );
 
         void Clear();
+        void Fill( const char fillChar, const U32 length );
+
+        void Truncate( const U32 length );
+        TString Left( const U32 length ) const;
+        TString Right( const U32 length ) const;
+        TString Mid( const U32 start, const U32 length ) const;
+
+        TString& StripFilename();
+        TString& StripPath();
+        TString& StripFileExtension();
+        TString ExtractFilename() const;
+        TString ExtractFilePath() const;
+        TString ExtractFileExtension() const;
 
         static TString Format( const char* format, ... );
         static I32 vsnPrintf( char* dest, I32 size, const char* fmt, va_list argptr );
@@ -162,7 +175,7 @@ namespace Epoch {
     private:
         U32 _allocated = 0;
         U32 _length = 0;
-        char* _data;
+        char* _data = nullptr;
         char defaultBuffer[TSTRING_DEFAULT_BUFFER_SIZE];
     };
 

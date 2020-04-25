@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Defines.h"
 #include "Vector3.h"
 #include "Matrix4x4.h"
 #include "Quaternion.h"
@@ -9,17 +10,17 @@ namespace Epoch {
     /*
      * Represents the transform of an object or entity in the world.
      */
-    class Transform {
+    class EPOCH_API Transform {
     public:
 
         /** The position of this transform. */
-        Vector3 position;
+        Vector3 Position;
 
         /** The rotation of this transform. */
-        Quaternion rotation;
+        Quaternion Rotation;
 
         /** The scale of this transform. */
-        Vector3 scale = Vector3::One();
+        Vector3 Scale = Vector3::One();
     public:
 
         /**
@@ -40,5 +41,8 @@ namespace Epoch {
          * @return A new transformation matrix.
          */
         Matrix4x4 GetTransformation() const;
+
+    private:
+        void onPositionChanged( const Vector3& oldPosition, const Vector3& newPosition );
     };
 }

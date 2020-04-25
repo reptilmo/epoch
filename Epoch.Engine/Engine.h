@@ -1,16 +1,18 @@
 #pragma once
 
+#include "Defines.h"
 #include "Types.h"
 
 namespace Epoch {
 
     class Platform;
+    class World;
 
     /**
      * The main class which manages everything in the system. One of these is created
      * by the calling application.
      */
-    class Engine final {
+    class EPOCH_API Engine final {
     public:
 
         /**
@@ -45,5 +47,6 @@ namespace Epoch {
 
     private:
         Platform* _platform;
+        World* _world;
     };
 }
