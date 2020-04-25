@@ -72,7 +72,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)External\Lib;C:\VulkanSDK\1.2.131.2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/NODEFAULTLIB:glfw3.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
@@ -103,7 +103,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)External\Lib;C:\VulkanSDK\1.2.131.2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>$(SolutionDir)tools\post-build.bat $(SolutionDir)</Command>
@@ -138,9 +138,8 @@
     <ClCompile Include="Math\Vector3.cpp" />
     <ClCompile Include="Math\Vector4.cpp" />
     <ClCompile Include="Platform\FileHelper.cpp" />
-    <ClCompile Include="Platform\Platform.cpp" />
-    <ClCompile Include="Platform\TGLFWWindow.cpp" />
     <ClCompile Include="Platform\Windows\WindowsApplication.cpp" />
+    <ClCompile Include="Platform\Windows\WindowsVulkanPlatform.cpp" />
     <ClCompile Include="Platform\Windows\WindowsWindow.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanCommandBuffer.cpp" />
     <ClCompile Include="Renderer\Backend\Vulkan\VulkanCommandPool.cpp" />
@@ -212,9 +211,8 @@
     <ClInclude Include="Memory\Memory.h" />
     <ClInclude Include="Platform\FileHelper.h" />
     <ClInclude Include="Platform\IApplication.h" />
-    <ClInclude Include="Platform\TGLFWWindow.h" />
     <ClInclude Include="Platform\IWindow.h" />
-    <ClInclude Include="Platform\Platform.h" />
+    <ClInclude Include="Platform\VulkanPlatform.h" />
     <ClInclude Include="Platform\Windows\WindowsApplication.h" />
     <ClInclude Include="Platform\Windows\WindowsWindow.h" />
     <ClInclude Include="Renderer\Backend\IRendererBackend.h" />

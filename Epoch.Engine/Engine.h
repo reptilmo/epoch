@@ -5,7 +5,7 @@
 
 namespace Epoch {
 
-    class Platform;
+    class IApplication;
     class World;
 
     /**
@@ -18,9 +18,9 @@ namespace Epoch {
         /**
          * Creates a new Engine. Run() must be called after this to kick things off.
          * 
-         * @param applicationName The name of the application. This is used in the created window.
+         * @param application A pointer to the instance of the application.
          */
-        Engine( const char* applicationName );
+        Engine( IApplication* application );
 
         /**
          * The default destructor.
@@ -28,9 +28,9 @@ namespace Epoch {
         ~Engine();
 
         /**
-         * Returns a pointer to the platform layer owned by this engine.
+         * Returns a pointer to the application layer owned by this engine.
          */
-        Platform* GetPlatform() { return _platform; }
+        IApplication* GetApplication() { return _application; }
 
         /**
          * Kicks off engine initialization and ultimately the game loop.
@@ -46,7 +46,7 @@ namespace Epoch {
         const bool OnLoop( const F32 deltaTime );
 
     private:
-        Platform* _platform;
+        IApplication* _application;
         World* _world;
     };
 }
