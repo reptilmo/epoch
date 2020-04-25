@@ -1,4 +1,6 @@
-#include "../../../Platform/Platform.h"
+#include "../../../Platform/VulkanPlatform.h"
+#include "../../../Platform/IApplication.h"
+#include "../../../Platform/IWindow.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
 #include "../../../Memory/Memory.h"
@@ -13,6 +15,8 @@
 #include "../../../Resources/StaticMesh.h"
 #include "../../Material.h"
 #include "../../IShader.h"
+
+#include "../../../Events/Event.h"
 
 #include "VulkanUtilities.h"
 #include "VulkanImage.h"
@@ -40,8 +44,8 @@
 
 namespace Epoch {
 
-    VulkanRendererBackend::VulkanRendererBackend( Platform* platform ) {
-        _platform = platform;
+    VulkanRendererBackend::VulkanRendererBackend( IApplication* application ) {
+        _application = application;
         Logger::Trace( "Creating Vulkan renderer backend..." );
     }
 
@@ -63,18 +67,20 @@ namespace Epoch {
         _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
 #endif
 
+        IWindow* applicationWindow = _application->GetApplicationWindow();
+
         // Create the surface
-        _platform->CreateSurface( _instance, &_surface );
+        VulkanPlatform::CreateSurface( applicationWindow->GetHandle(), _instance, &_surface );
 
         // Create VulkanDevice
         _device = new VulkanDevice( _instance, _requiredValidationLayers, _surface );
 
         // HACK: This is here until the platform layer is removed.
-        _device->FramebufferSize = _platform->GetFramebufferExtent();
+        _device->FramebufferSize = applicationWindow->GetFramebufferExtent();
 
         // Create swapchain
-        Extent2D extent = _platform->GetFramebufferExtent();
-        _swapchain = new VulkanSwapchain( _device, _surface, _platform->GetWindow(), extent.Width, extent.Height );
+        Extent2D extent = applicationWindow->GetFramebufferExtent();
+        _swapchain = new VulkanSwapchain( _device, _surface, applicationWindow->GetHandle(), extent.Width, extent.Height );
 
         // Listen for resize events.
         Event::Listen( EventType::WINDOW_RESIZED, this );
@@ -201,28 +207,7 @@ namespace Epoch {
         clearInfo.Stencil = 0;
         currentCommandBuffer->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
 
-        //U32 renderListCount = (U32)_currentRenderList.size();
-
-        //// Get a flat list of all shaders currently in use.
-        //std::vector<IShader*> frameShaders;
-        //for( U32 i = 0; i < renderListCount; ++i ) {
-        //    bool added = false;
-        //    IShader* shader = _currentRenderList[i].Material->GetShader();
-        //    for( auto fs : frameShaders ) {
-        //        if( fs == shader ) {
-        //            added = true;
-        //            break;
-        //        }
-        //    }
-        //    if( !added ) {
-        //        frameShaders.push_back( shader );
-        //    }
-        //}
-
-
-
-        // TEMP
-
+        // TEMP =======================================================================
         // TODO: obtain from camera
         Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
         //Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 0.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
@@ -237,19 +222,7 @@ namespace Epoch {
         correction.Data()[14] = 0.5f;
         correction.Data()[15] = 1.0f;
         projection *= correction;
-
-        // END TEMP
-
-        // Reset the shader descriptors
-        //for( auto fs : frameShaders ) {
-        //    fs->ResetDescriptors( _currentImageIndex );
-
-        //    // TODO: Don't create this every frame, save off locally
-        //    GlobalUniformObject guo;
-        //    guo.Projection = projection;
-        //    guo.View = view;
-        //    fs->SetGlobalUniform( currentCommandBuffer, guo, _currentImageIndex );
-        //}
+        // END TEMP ===================================================================
 
         IShader* currentShader = nullptr;
         if( _renderTable->StaticMeshCount > 0 ) {
@@ -338,9 +311,6 @@ namespace Epoch {
         // Give the image back to the swapchain.
         _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[swapchainFrameIndex], _currentImageIndex );
 
-        // Clear the render list for the next frame.
-        //_currentRenderList.clear();
-
         return true;
     }
 
@@ -378,8 +348,8 @@ namespace Epoch {
         case EventType::WINDOW_RESIZED:
             //const WindowResizedEvent wre = (const WindowResizedEvent)event;
             _framebufferResizeOccurred = true;
-            if( _platform && _device ) {
-                _device->FramebufferSize = _platform->GetFramebufferExtent();
+            if( _application && _device ) {
+                _device->FramebufferSize = _application->GetApplicationWindow()->GetFramebufferExtent();
             }
             break;
         default:
@@ -392,7 +362,7 @@ namespace Epoch {
     }
 
     Extent2D VulkanRendererBackend::GetFramebufferExtent() {
-        return _platform->GetFramebufferExtent();
+        return _application->GetApplicationWindow()->GetFramebufferExtent();
     }
 
     IShader* VulkanRendererBackend::GetBuiltinMaterialShader( const MaterialType type ) {
@@ -415,17 +385,10 @@ namespace Epoch {
         instanceCreateInfo.pApplicationInfo = &appInfo;
 
         // Extensions
-        const char** pfe = nullptr;
-        U32 count = 0;
-        _platform->GetRequiredExtensions( &count, &pfe );
-        std::vector<const char*> platformExtensions;
-        for( U32 i = 0; i < count; ++i ) {
-            platformExtensions.push_back( pfe[i] );
-        }
-        platformExtensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
-
-        instanceCreateInfo.enabledExtensionCount = (U32)platformExtensions.size();
-        instanceCreateInfo.ppEnabledExtensionNames = platformExtensions.data();
+        List<const char*> requiredExtensions;
+        VulkanPlatform::GetRequiredExtensions( requiredExtensions );
+        instanceCreateInfo.enabledExtensionCount = requiredExtensions.Size();
+        instanceCreateInfo.ppEnabledExtensionNames = requiredExtensions.Data();
 
         // Validation layers
 #ifdef VULKAN_USE_VALIDATION
@@ -543,10 +506,9 @@ namespace Epoch {
             return;
         }
         _recreatingSwapchain = true;
-        Extent2D extent = _platform->GetFramebufferExtent();
+        Extent2D extent = _application->GetApplicationWindow()->GetFramebufferExtent();
         while( extent.Width == 0 || extent.Height == 0 ) {
-            extent = _platform->GetFramebufferExtent();
-            _platform->WaitEvents();
+            extent = _application->GetApplicationWindow()->GetFramebufferExtent();
         }
 
         // Cleanup and recreate swapchain.

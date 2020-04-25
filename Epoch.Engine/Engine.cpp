@@ -2,7 +2,6 @@
 #include "Renderer/Frontend/RendererFrontend.h"
 
 #include "Logger.h"
-#include "Platform/Platform.h"
 #include "Events/EventManager.h"
 #include "Time/Clock.h"
 #include "World/World.h"
@@ -11,9 +10,9 @@
 
 namespace Epoch {
 
-    Engine::Engine( const char* applicationName ) {
+    Engine::Engine( IApplication* application ) {
         Epoch::Logger::Log( "Initializing Epoch Engine: %d", 4 );
-        _platform = new Platform( this, applicationName );        
+        _application = application;     
     }
 
     Engine::~Engine() {
@@ -24,10 +23,7 @@ namespace Epoch {
             _world = nullptr;
         }
 
-        if( _platform ) {
-            delete _platform;
-            _platform = nullptr;
-        }
+        _application = nullptr;
     }
 
     void Engine::Run() {
@@ -37,10 +33,6 @@ namespace Epoch {
 
         // Create the world.
         _world = new World();
-
-        if( _platform ) {
-            _platform->StartGameLoop();
-        }
     }
 
     const bool Engine::OnLoop( const F32 deltaTime ) {

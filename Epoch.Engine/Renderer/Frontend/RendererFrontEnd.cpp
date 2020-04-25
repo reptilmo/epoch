@@ -10,11 +10,6 @@
 
 #include "RendererFrontend.h"
 
-// TEMP
-#include "../../World/EntityComponents/StaticMeshEntityComponent.h"
-//#include "../../Assets/StaticMesh/StaticMesh.h"
-//#include "../../Math/Rotator.h"
-
 namespace Epoch {
 
     // A pointer to the engine which owns this renderer.
@@ -26,9 +21,6 @@ namespace Epoch {
     // The internal texture cache.
     TextureCache* RendererFrontEnd::_textureCache;
 
-    // TEMP
-    //static StaticMesh* testMesh;
-
     const bool RendererFrontEnd::Initialize( Engine* engine ) {
 
         _engine = engine;
@@ -36,27 +28,18 @@ namespace Epoch {
 
         // TODO: Choose this from configuration instead of hardcoding it.
         // TODO: Should probably be created via factory to prevent this class from knowing about the specific type.
-        _backend = new VulkanRendererBackend( _engine->GetPlatform() );
+        _backend = new VulkanRendererBackend( _engine->GetApplication() );
         _backend->Initialize();
 
         _textureCache = new TextureCache();
         _textureCache->Initialize();
         MaterialManager::Initialize();
 
-        // TEMP: Load a test mesh
-        //testMesh = StaticMesh::FromFile( "test", "assets/models/sibenik.obj", true );
-
         return true;
     }
 
     void RendererFrontEnd::Shutdown() {
         _engine = nullptr;
-
-        /*if( testMesh ) {
-            testMesh->Unload();
-            delete testMesh;
-            testMesh = nullptr;
-        }*/
 
         if( _backend ) {
             _backend->Shutdown();
@@ -84,43 +67,6 @@ namespace Epoch {
 
         // TODO: All front-end work goes here (scene sorting, culling, etc) before adding the object to the render table.
 
-        //// Static mesh group
-        ////U32 staticMeshCount = objectTable.StaticMeshes.Size();
-        //U32 maxRefCount = 0;
-        //for( U32 i = 0; i < objectTable.StaticMeshCount; ++i ) {
-
-        //    // TODO: Determine if this needs to be frustum or occlusion culled, or distance clipped, etc.
-
-        //    // Add to total reference count
-        //    maxRefCount += 1;// ( (StaticMeshEntityComponent*)objectTable.StaticMeshes[i] )->GetRenderReferenceDataCount();
-
-
-
-        //    //_backend->AddToFrameRenderList( objectTable.StaticMeshes[i] );
-        //}
-
-        //BackendRenderTable renderTable( maxRefCount );
-        //for( U32 i = 0; i < objectTable.StaticMeshCount; ++i ) {
-
-        //    // TODO: Determine if this needs to be frustum or occlusion culled, or distance clipped, etc.
-
-        //    // Add to total reference count
-        //    StaticMeshEntityComponent* component = static_cast<StaticMeshEntityComponent*>( objectTable.StaticMeshes[i] );
-        //    if( component->HasReferenceData() ) {
-        //        renderTable.StaticMeshReferences[renderTable.StaticMeshReferenceCount] = static_cast<StaticMeshRenderReferenceData*>( ( component )->GetReferenceData() );
-        //        renderTable.StaticMeshReferenceCount++;
-        //    }
-
-        //    //_backend->AddToFrameRenderList( objectTable.StaticMeshes[i] );
-        //}
-
-        //// TODO: consolidate these
-        //BackendRenderTable renderTable( objectTable->StaticMeshCount );
-        //renderTable.StaticMeshCount = objectTable.StaticMeshCount;
-        //for( U32 i = 0; i < objectTable.StaticMeshCount; ++i ) {
-        //    renderTable.StaticMeshes[i] = objectTable.StaticMeshes[i];
-        //}
-
         /*if( objectTable->StaticMeshCount > 1 ) {
             sortByMaterialShader( objectTable->StaticMeshes, objectTable->StaticMeshCount );
         }*/
@@ -129,14 +75,11 @@ namespace Epoch {
 
         // TODO: Within each group, sort by material.
 
-        // For special items like fog and water, specialized calls will need to be made as these will require additional render passes.
+        // TODO: For special items like fog and water, specialized calls will need to be made as these will require additional render passes.
 
-        // Afterward, do full-screen post fx
+        // TODO: vAfterward, do full-screen post fx
 
-        // Finally render UI
-
-
-
+        // TODO: Finally render UI
 
         // If the frame preparation indicates we should wait, boot out early.
         if( !_backend->IsShutdown() ) {

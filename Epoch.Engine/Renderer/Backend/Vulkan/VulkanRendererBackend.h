@@ -22,7 +22,7 @@ namespace Epoch {
     class TString;
     class IUnlitShader;
 
-    class Platform;
+    class IApplication;
     class VulkanVertex3DBuffer;
     class VulkanIndexBuffer;
     class VulkanImage;
@@ -47,11 +47,11 @@ namespace Epoch {
     public:
 
         /**
-         * Creates a new renderer backend.
+         * Creates a new Vulkan renderer backend.
          * 
-         * @param platform A pointer to the platform layer.
+         * @param application A pointer to the application layer.
          */
-        VulkanRendererBackend( Platform* platform );
+        VulkanRendererBackend( IApplication* application );
 
         /**
          * Default destructor.
@@ -162,7 +162,7 @@ namespace Epoch {
     private:
         bool _isShutDown = false;
         U32 _currentImageIndex = 0;
-        Platform* _platform = nullptr;
+        IApplication* _application = nullptr;
 
         std::vector<const char*> _requiredValidationLayers;
 
@@ -195,7 +195,6 @@ namespace Epoch {
         // Buffers
         VulkanVertex3DBuffer* _vertexBuffer = nullptr;
         VulkanIndexBuffer* _indexBuffer = nullptr;
-
 
         WorldRenderableObjectTable* _renderTable;
     };
