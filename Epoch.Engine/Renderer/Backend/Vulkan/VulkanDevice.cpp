@@ -4,6 +4,7 @@
 #include "../../../Types.h"
 #include "../../../Logger.h"
 
+#include "VulkanRendererBackend.h"
 #include "VulkanCommandPool.h"
 #include "VulkanCommandBuffer.h"
 #include "VulkanUtilities.h"
@@ -254,7 +255,7 @@ namespace Epoch {
         };
         deviceCreateInfo.ppEnabledExtensionNames = requiredExtensions;
 
-#if _DEBUG
+#if VULKAN_USE_VALIDATION
         deviceCreateInfo.enabledLayerCount = (U32)requiredValidationLayers.size();
         deviceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
 #else

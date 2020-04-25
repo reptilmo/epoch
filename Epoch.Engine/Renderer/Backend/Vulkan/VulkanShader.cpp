@@ -100,11 +100,27 @@ namespace Epoch {
                 _objectUniformBuffers[i] = nullptr;
             }
         }
-        _globalUniformBuffers.clear();
-        _objectUniformBuffers.clear();
-        _globalUbos.clear();
-        _objectUbos.clear();
-        
+
+        // Free global UBOs
+        for( U32 i = 0; i < _globalUBOCount; ++i ) {
+            if( _globalUniformBuffers[i] ) {
+                delete _globalUniformBuffers[i];
+                _globalUniformBuffers[i] = nullptr;
+            }
+        }
+        TMemory::Free( _globalUniformBuffers );
+        TMemory::Free( _globalUbos );
+
+        // Free object UBOs
+        for( U32 i = 0; i < _objectUBOCount; ++i ) {
+            if( _objectUniformBuffers[i] ) {
+                delete _objectUniformBuffers[i];
+                _objectUniformBuffers[i] = nullptr;
+            }
+        }
+        TMemory::Free( _objectUniformBuffers );
+        TMemory::Free( _objectUbos );
+
         destroyPipeline();
 
         for( U32 i = 0; i < _imageCount; ++i ) {
@@ -113,7 +129,8 @@ namespace Epoch {
                 _textureSamplers[i] = nullptr;
             }
         }
-        _textureSamplers.clear();
+        TMemory::Free( _textureSamplers );
+        _textureSamplerCount = 0;
 
         for( U32 i = 0; i < _imageCount; ++i ) {
             if( _globalDescriptorPools[i] ) {
@@ -126,8 +143,22 @@ namespace Epoch {
                 _objectDescriptorPools[i] = nullptr;
             }
         }
-        _globalDescriptorPools.clear();
-        _objectDescriptorPools.clear();
+
+        // Free global descriptor pools.
+        _globalDescriptorPoolCount = 0;
+        _globalDescriptorSetFrameCount = 0;
+        TMemory::Free( _globalDescriptorPools );
+        TMemory::Free( _globalDescriptorSets );
+
+        // Free object descriptor pools.
+        _objectDescriptorPoolCount = 0;
+        TMemory::Free( _objectDescriptorPools );
+        for( U32 i = 0; i < _objectDescriptorSetFrameCount; ++i ) {
+            TMemory::Free( _objectDescriptorSets[i] );
+        }
+        TMemory::Free( _objectDescriptorSets );
+        _objectDescriptorSetFrameCount = 0;
+        _objectDescriptorSetObjectCount = 0;
 
         if( _globalDescriptorSetLayout ) {
             vkDestroyDescriptorSetLayout( _device->LogicalDevice, _globalDescriptorSetLayout, nullptr );
@@ -244,12 +275,12 @@ namespace Epoch {
 
     void VulkanShader::BindDescriptor( ICommandBuffer* commandBuffer, const U32 frameIndex, const U32 objectIndex ) {
         //vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 0, 1, &_objectDescriptorSets[frameIndex][objectIndex], 0, nullptr );
-        
+
         VkDescriptorSet descriptorSets[2];
         descriptorSets[0] = _globalDescriptorSets[frameIndex];
-        descriptorSets[1] = _objectDescriptorSets[frameIndex][objectIndex]; 
+        descriptorSets[1] = _objectDescriptorSets[frameIndex][objectIndex];
 
-        vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(), 
+        vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->Handle, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(),
             0, 2, descriptorSets, 0, nullptr );
 
         /*vkCmdBindDescriptorSets( static_cast<VulkanCommandBuffer*>( commandBuffer )->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline->GetLayout(),
@@ -301,7 +332,7 @@ namespace Epoch {
         bufferInfo.range = range;
 
         // Perform the ubo update.
-        _objectUbos[frameIndex].Model = _model;        
+        _objectUbos[frameIndex].Model = _model;
 
         // Copy
         void* data = _objectUniformBuffers[frameIndex]->GetInternal()->LockMemory( offset, range, 0 );
@@ -318,7 +349,7 @@ namespace Epoch {
             imageInfo.sampler = _textureSamplers[frameIndex]->GetHandle();
         }
 
-        std::vector<VkWriteDescriptorSet> descriptorWrites( 2 );
+        VkWriteDescriptorSet descriptorWrites[2];
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = _objectDescriptorSets[frameIndex][objectIndex];
         descriptorWrites[0].dstBinding = 0;
@@ -342,7 +373,7 @@ namespace Epoch {
             descriptorWrites[1].pImageInfo = nullptr;
         }
 
-        vkUpdateDescriptorSets( _device->LogicalDevice, 2, descriptorWrites.data(), 0, nullptr );
+        vkUpdateDescriptorSets( _device->LogicalDevice, 2, &descriptorWrites[0], 0, nullptr );
     }
 
     void VulkanUnlitShader::createDescriptorSetLayout() {
@@ -405,9 +436,14 @@ namespace Epoch {
         globalPoolInfo.pPoolSizes = &poolSize;
         globalPoolInfo.maxSets = _imageCount;
 
-        // Create a pool per frame (double/triple).
-        _globalDescriptorPools.resize( _imageCount );
-        _globalDescriptorSets.resize( _imageCount );
+        // Global descriptor pool: Used for global items such as view/projection matrix. Create one pool per frame (double/triple).
+        _globalDescriptorPoolCount = _imageCount;
+        _globalDescriptorPools = static_cast<VkDescriptorPool*>( TMemory::Allocate( sizeof( VkDescriptorPool ) * _globalDescriptorPoolCount ) );
+
+        // Global descriptor set: Reserve memory for one descriptor set per frame.
+        _globalDescriptorSetFrameCount = _imageCount;
+        _globalDescriptorSets = static_cast<VkDescriptorSet*>( TMemory::Allocate( sizeof( VkDescriptorSet ) * _globalDescriptorSetFrameCount ) );
+
         for( U32 i = 0; i < _imageCount; ++i ) {
             VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &globalPoolInfo, nullptr, &_globalDescriptorPools[i] ) );
         }
@@ -431,17 +467,23 @@ namespace Epoch {
         poolInfo.maxSets = VULKAN_MAX_DESC_SETS;
 
         // Create a pool per frame (double/triple).
-        _objectDescriptorPools.resize( _imageCount );
-        _objectDescriptorSets.resize( _imageCount );
+        _objectDescriptorPoolCount = _imageCount;
+        _objectDescriptorPools = static_cast<VkDescriptorPool*>( TMemory::Allocate( sizeof( VkDescriptorPool ) * _objectDescriptorPoolCount ) );
+
+        _objectDescriptorSetFrameCount = _imageCount;
+        _objectDescriptorSets = static_cast<VkDescriptorSet**>( TMemory::Allocate( sizeof( VkDescriptorSet* ) * _objectDescriptorSetFrameCount ) );
         for( U32 i = 0; i < _imageCount; ++i ) {
-            _objectDescriptorSets[i].resize( VULKAN_MAX_DESC_SETS );
+            _objectDescriptorSetObjectCount = VULKAN_MAX_DESC_SETS;
+            _objectDescriptorSets[i] = static_cast<VkDescriptorSet*>( TMemory::Allocate( sizeof( VkDescriptorSet ) * _objectDescriptorSetObjectCount ) );
             VK_CHECK( vkCreateDescriptorPool( _device->LogicalDevice, &poolInfo, nullptr, &_objectDescriptorPools[i] ) );
         }
     }
 
     void VulkanUnlitShader::createTextureSamplers() {
-        for( U32 i = 0; i < _imageCount; ++i ) {
-            _textureSamplers.push_back( new VulkanTextureSampler( _device ) );
+        _textureSamplerCount = _imageCount;
+        _textureSamplers = static_cast<VulkanTextureSampler**>( TMemory::Allocate( sizeof( VulkanTextureSampler* ) * _textureSamplerCount ) );
+        for( U32 i = 0; i < _textureSamplerCount; ++i ) {
+            _textureSamplers[i] = new VulkanTextureSampler( _device );
         }
     }
 
@@ -472,20 +514,22 @@ namespace Epoch {
 
     void VulkanUnlitShader::createUniformBuffers() {
 
-        // Per-object UBOs
-        _objectUbos.resize( _imageCount );
-        _objectUniformBuffers.resize( _imageCount );
-        for( U64 i = 0; i < _imageCount; ++i ) {
-            _objectUniformBuffers[i] = new VulkanBuffer<Epoch::UnlitUniformObject>( _device, VulkanBufferType::UNIFORM );
-            _objectUniformBuffers[i]->Allocate( sizeof( UnlitUniformObject ) * VULKAN_MAX_UNIFORM_BUFFERS );
-        }
-
         // Global UBOs
-        _globalUbos.resize( _imageCount );
-        _globalUniformBuffers.resize( _imageCount );
+        _globalUBOCount = _imageCount;
+        _globalUniformBuffers = static_cast<VulkanBuffer<GlobalUniformObject>**>( TMemory::Allocate( sizeof( VulkanBuffer<GlobalUniformObject>* ) * _globalUBOCount ) );
+        _globalUbos = static_cast<GlobalUniformObject*>( TMemory::Allocate( sizeof( GlobalUniformObject ) * _globalUBOCount ) );
         for( U64 i = 0; i < _imageCount; ++i ) {
             _globalUniformBuffers[i] = new VulkanBuffer<GlobalUniformObject>( _device, VulkanBufferType::UNIFORM );
             _globalUniformBuffers[i]->Allocate( sizeof( GlobalUniformObject ) * _imageCount );
+        }
+
+        // Per-object UBOs
+        _objectUBOCount = _imageCount;
+        _objectUniformBuffers = static_cast<VulkanBuffer<UnlitUniformObject>**>( TMemory::Allocate( sizeof( VulkanBuffer<UnlitUniformObject>* ) * _objectUBOCount ) );
+        _objectUbos = static_cast<UnlitUniformObject*>( TMemory::Allocate( sizeof( UnlitUniformObject ) * _objectUBOCount ) );
+        for( U64 i = 0; i < _imageCount; ++i ) {
+            _objectUniformBuffers[i] = new VulkanBuffer<Epoch::UnlitUniformObject>( _device, VulkanBufferType::UNIFORM );
+            _objectUniformBuffers[i]->Allocate( sizeof( UnlitUniformObject ) * VULKAN_MAX_UNIFORM_BUFFERS );
         }
     }
 }

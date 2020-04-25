@@ -13,6 +13,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Epoch.Engine.Test", "Epoch.Engine.Test\Epoch.Engine.Test.vcxproj", "{233EF517-B73F-41CD-AE61-17D0A4ABCE95}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Epoch.TestBedGame", "Epoch.TestBedGame\Epoch.TestBedGame.vcxproj", "{9BCCBF7F-18F0-4797-8807-99C84C905BDC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9460A7EE-9E01-4C9B-A4EB-64503301CF75} = {9460A7EE-9E01-4C9B-A4EB-64503301CF75}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Epoch.Tools", "Epoch.Tools\Epoch.Tools.vcxproj", "{CAC48A1A-18F4-4DAB-AA90-C7C257D23E86}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9460A7EE-9E01-4C9B-A4EB-64503301CF75} = {9460A7EE-9E01-4C9B-A4EB-64503301CF75}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -27,6 +37,14 @@ Global
 		{233EF517-B73F-41CD-AE61-17D0A4ABCE95}.Debug|x64.Build.0 = Debug|x64
 		{233EF517-B73F-41CD-AE61-17D0A4ABCE95}.Release|x64.ActiveCfg = Release|x64
 		{233EF517-B73F-41CD-AE61-17D0A4ABCE95}.Release|x64.Build.0 = Release|x64
+		{9BCCBF7F-18F0-4797-8807-99C84C905BDC}.Debug|x64.ActiveCfg = Debug|x64
+		{9BCCBF7F-18F0-4797-8807-99C84C905BDC}.Debug|x64.Build.0 = Debug|x64
+		{9BCCBF7F-18F0-4797-8807-99C84C905BDC}.Release|x64.ActiveCfg = Release|x64
+		{9BCCBF7F-18F0-4797-8807-99C84C905BDC}.Release|x64.Build.0 = Release|x64
+		{CAC48A1A-18F4-4DAB-AA90-C7C257D23E86}.Debug|x64.ActiveCfg = Debug|x64
+		{CAC48A1A-18F4-4DAB-AA90-C7C257D23E86}.Debug|x64.Build.0 = Debug|x64
+		{CAC48A1A-18F4-4DAB-AA90-C7C257D23E86}.Release|x64.ActiveCfg = Release|x64
+		{CAC48A1A-18F4-4DAB-AA90-C7C257D23E86}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,7 +1,3 @@
-
-// TODO: temp
-#include <chrono>
-
 #include "../../../Platform/Platform.h"
 #include "../../../Logger.h"
 #include "../../../Defines.h"
@@ -14,7 +10,7 @@
 #include "../../../String/TString.h"
 
 #include "../../../Resources/ITexture.h"
-#include "../../MeshData.h"
+#include "../../../Resources/StaticMesh.h"
 #include "../../Material.h"
 #include "../../IShader.h"
 
@@ -24,9 +20,7 @@
 #include "VulkanInternalBuffer.h"
 #include "VulkanVertex3DBuffer.h"
 #include "VulkanIndexBuffer.h"
-#if _DEBUG
-#include "VulkanDebugger.h"
-#endif
+
 #include "VulkanDevice.h"
 #include "VulkanRenderPassManager.h"
 #include "VulkanFence.h"
@@ -39,6 +33,10 @@
 #include "VulkanShader.h"
 
 #include "VulkanRendererBackend.h"
+
+#if VULKAN_USE_VALIDATION
+#include "VulkanDebugger.h"
+#endif
 
 namespace Epoch {
 
@@ -61,7 +59,7 @@ namespace Epoch {
         createInstance();
 
         // Create debugger
-#if _DEBUG
+#if VULKAN_USE_VALIDATION
         _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
 #endif
 
@@ -148,7 +146,7 @@ namespace Epoch {
 
         vkDestroySurfaceKHR( _instance, _surface, nullptr );
 
-#if _DEBUG
+#if VULKAN_USE_VALIDATION
         if( _debugger ) {
             delete _debugger;
             _debugger = nullptr;
@@ -191,6 +189,7 @@ namespace Epoch {
 
         // Begin recording.
         VulkanCommandBuffer* currentCommandBuffer = _commandBuffers[_currentImageIndex];
+        currentCommandBuffer->Reset();
         currentCommandBuffer->Begin();
 
         // Begin the render pass. TODO: Should probably create these once and reuse.
@@ -202,73 +201,92 @@ namespace Epoch {
         clearInfo.Stencil = 0;
         currentCommandBuffer->BeginRenderPass( clearInfo, _swapchain->GetFramebuffer( _currentImageIndex ), renderPass );
 
-        U32 renderListCount = (U32)_currentRenderList.size();
+        //U32 renderListCount = (U32)_currentRenderList.size();
 
-        // Get a flat list of all shaders currently in use.
-        std::vector<IShader*> frameShaders;
-        for( U32 i = 0; i < renderListCount; ++i ) {
-            bool added = false;
-            IShader* shader = _currentRenderList[i]->Material->GetShader();
-            for( auto fs : frameShaders ) {
-                if( fs == shader ) {
-                    added = true;
-                    break;
-                }
-            }
-            if( !added ) {
-                frameShaders.push_back( shader );
-            }
-        }
+        //// Get a flat list of all shaders currently in use.
+        //std::vector<IShader*> frameShaders;
+        //for( U32 i = 0; i < renderListCount; ++i ) {
+        //    bool added = false;
+        //    IShader* shader = _currentRenderList[i].Material->GetShader();
+        //    for( auto fs : frameShaders ) {
+        //        if( fs == shader ) {
+        //            added = true;
+        //            break;
+        //        }
+        //    }
+        //    if( !added ) {
+        //        frameShaders.push_back( shader );
+        //    }
+        //}
 
 
 
         // TEMP
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        F32 time = std::chrono::duration<F32, std::chrono::seconds::period>( currentTime - startTime ).count();
-
-
-        Rotator rotator;
-        rotator.Pitch = time * 90.0f * 0.1f;
-        rotator.Roll = 90.0f;
-        Matrix4x4 model = Matrix4x4::Identity();
-        model *= Matrix4x4::Translation( Vector3( 0.0f, 0.0f, 0.0f ) );
-        model *= rotator.ToQuaternion().ToMatrix4x4();
 
         // TODO: obtain from camera
         Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 25.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
+        //Matrix4x4 view = Matrix4x4::LookAt( Vector3( 0.0f, 0.0f, 25.0f ), Vector3::Zero(), Vector3::Up() );
 
         // TODO: obtain from private var, set only on change of camera/window
         VkExtent2D extent = _swapchain->Extent;
         Matrix4x4 projection = Matrix4x4::Perspective( TMath::DegToRad( 90.0f ), (F32)extent.width / (F32)extent.height, 0.1f, 1000.0f );
+        Matrix4x4 correction;
+        correction.Data()[0] = 1.0f;
+        correction.Data()[5] = -1.0f;
+        correction.Data()[10] = 0.5f;
+        correction.Data()[14] = 0.5f;
+        correction.Data()[15] = 1.0f;
+        projection *= correction;
 
         // END TEMP
 
         // Reset the shader descriptors
-        for( auto fs : frameShaders ) {
-            fs->ResetDescriptors( _currentImageIndex );
+        //for( auto fs : frameShaders ) {
+        //    fs->ResetDescriptors( _currentImageIndex );
+
+        //    // TODO: Don't create this every frame, save off locally
+        //    GlobalUniformObject guo;
+        //    guo.Projection = projection;
+        //    guo.View = view;
+        //    fs->SetGlobalUniform( currentCommandBuffer, guo, _currentImageIndex );
+        //}
+
+        IShader* currentShader = nullptr;
+        if( _renderTable->StaticMeshCount > 0 ) {
+            StaticMeshRenderReferenceData* ref = static_cast<StaticMeshRenderReferenceData*>( _renderTable->StaticMeshes[0]->GetReferenceData() );
+            currentShader = ref->Material->GetShader();
+            currentShader->ResetDescriptors( _currentImageIndex );
 
             // TODO: Don't create this every frame, save off locally
             GlobalUniformObject guo;
             guo.Projection = projection;
             guo.View = view;
-            fs->SetGlobalUniform( currentCommandBuffer, guo, _currentImageIndex );
+            currentShader->SetGlobalUniform( currentCommandBuffer, guo, _currentImageIndex );
         }
 
-        // Draw everything in the render list.        
-        for( U32 i = 0; i < renderListCount; ++i ) {
-            const MeshRendererReferenceData* ref = _currentRenderList[i];
+        // Draw static meshes.        
+        for( U32 i = 0; i < _renderTable->StaticMeshCount; ++i ) {
+            StaticMeshEntityComponent* entity = _renderTable->StaticMeshes[i];
+            const StaticMeshRenderReferenceData* ref = static_cast<StaticMeshRenderReferenceData*>( entity->GetReferenceData() );
             const VulkanBufferDataBlock* vertexBlock = _vertexBuffer->GetDataRangeByIndex( ref->VertexHeapIndex );
             const VulkanBufferDataBlock* indexBlock = _indexBuffer->GetDataRangeByIndex( ref->IndexHeapIndex );
 
             // Update the current descriptor set.
             IShader* shader = ref->Material->GetShader();
+            if( shader != currentShader ) {
+                currentShader->ResetDescriptors( _currentImageIndex );
+
+                // TODO: Don't create this every frame, save off locally
+                GlobalUniformObject guo;
+                guo.Projection = projection;
+                guo.View = view;
+                currentShader->SetGlobalUniform( currentCommandBuffer, guo, _currentImageIndex );
+            }
 
             // Bind the buffer to the graphics pipeline
             shader->BindPipeline( currentCommandBuffer );
 
-            shader->SetModel( model );
+            shader->SetModel( *entity->GetWorldMatrix() );
 
             // Update the descriptor for this object.
             shader->UpdateDescriptor( currentCommandBuffer, _currentImageIndex, i, ref->Material );
@@ -285,7 +303,7 @@ namespace Epoch {
             // Make the draw call.
             //vkCmdDraw( _commandBuffers[imageIndex], 3, 1, 0, 0 );
 
-            vkCmdDrawIndexed( currentCommandBuffer->GetHandle(), (U32)indexBlock->ElementCount, 1, 0, 0, 0 );
+            vkCmdDrawIndexed( currentCommandBuffer->Handle, (U32)indexBlock->ElementCount, 1, 0, 0, 0 );
         }
 
         // End render pass.
@@ -312,22 +330,21 @@ namespace Epoch {
         _inFlightImageFences[swapchainFrameIndex]->Reset();
 
         // Ensure that the operation cannot begin until the image is available.
-        _commandBuffers[_currentImageIndex]->AddWaitSemaphore( VK_STRUCTURE_TYPE_SUBMIT_INFO, _imageAvailableSemaphores[swapchainFrameIndex] );
+        _commandBuffers[_currentImageIndex]->AddWaitSemaphore( VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, _imageAvailableSemaphores[swapchainFrameIndex] );
 
         // Submit the queue and wait for the operation to complete.
-        VkSemaphore signalSemaphores[] = { _renderCompleteSemaphores[swapchainFrameIndex]->GetHandle() };
-        _device->GraphicsQueue->Submit( _commandBuffers[_currentImageIndex], _inFlightFences[swapchainFrameIndex], 1, signalSemaphores, false );
+        _device->GraphicsQueue->Submit( _commandBuffers[_currentImageIndex], _inFlightFences[swapchainFrameIndex], 1, &_renderCompleteSemaphores[swapchainFrameIndex]->Handle, false );
 
         // Give the image back to the swapchain.
         _swapchain->Present( _device->GraphicsQueue, _device->PresentationQueue, _renderCompleteSemaphores[swapchainFrameIndex], _currentImageIndex );
 
         // Clear the render list for the next frame.
-        _currentRenderList.clear();
+        //_currentRenderList.clear();
 
         return true;
     }
 
-    const bool VulkanRendererBackend::UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) {
+    const bool VulkanRendererBackend::UploadMeshData( const MeshUploadData& data, StaticMeshRenderReferenceData* referenceData ) {
 
         _device->GraphicsQueue->WaitIdle();
 
@@ -340,7 +357,7 @@ namespace Epoch {
         return true;
     }
 
-    void VulkanRendererBackend::FreeMeshData( MeshRendererReferenceData* referenceData ) {
+    void VulkanRendererBackend::FreeMeshData( StaticMeshRenderReferenceData* referenceData ) {
 
         _device->WaitIdle();
 
@@ -352,8 +369,8 @@ namespace Epoch {
         _indexBuffer->FreeDataRangeByIndex( referenceData->VertexHeapIndex );
     }
 
-    void VulkanRendererBackend::AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) {
-        _currentRenderList.push_back( referenceData );
+    void VulkanRendererBackend::SetRenderTable( WorldRenderableObjectTable* renderTable ) {
+        _renderTable = renderTable;
     }
 
     void VulkanRendererBackend::OnEvent( const Event* event ) {
@@ -411,7 +428,7 @@ namespace Epoch {
         instanceCreateInfo.ppEnabledExtensionNames = platformExtensions.data();
 
         // Validation layers
-#ifdef _DEBUG
+#ifdef VULKAN_USE_VALIDATION
         _requiredValidationLayers.push_back( "VK_LAYER_KHRONOS_validation" );
 
         // Get available layers.

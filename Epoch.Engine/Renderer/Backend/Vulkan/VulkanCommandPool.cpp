@@ -52,8 +52,7 @@ namespace Epoch {
     }
 
     void VulkanCommandPool::FreeCommandBuffer( VulkanCommandBuffer* commandBuffer ) {
-        VkCommandBuffer handle = commandBuffer->GetHandle();
-        vkFreeCommandBuffers( _device->LogicalDevice, _handle, 1, &handle );
+        vkFreeCommandBuffers( _device->LogicalDevice, _handle, 1, &commandBuffer->Handle );
         
         // TODO: recycle these objects.
         delete commandBuffer;

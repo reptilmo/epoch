@@ -73,6 +73,9 @@ namespace Epoch {
         // Arc sine (64-bit)
         static F64 ASin( const F64 x );
 
+        static F32 ATan2( const F32 x, const F32 y );
+        static F64 ATan2( const F64 x, const F64 y );
+
         // Arc cosine (32-bit) - input clamped to [-1, 1] to avoid silent NaN
         static F32 ACos( const F32 x );
 
@@ -234,6 +237,12 @@ namespace Epoch {
         // Converts radians to degrees.
         static F32 RadToDeg( const F32 radians );
 
+        static FORCEINLINE I32 Random() { return rand(); }
+        static FORCEINLINE F32 FloatRandom() { return Random() / (F32)RAND_MAX; }
+        static FORCEINLINE F32 FloatRandomRange( F32 min, F32 max ) {
+            return min + ( max - min ) * FloatRandom();
+        }
+
     public:
         // Constants
 
@@ -374,6 +383,55 @@ namespace Epoch {
             return (F64)HALF_PI;
         }
         return asin( x );
+    }
+
+    inline F32 TMath::ATan2( const F32 x, const F32 y ) {
+        // return atan2f( x, y );
+        // atan2f occasionally returns NaN with perfectly valid input (possibly due to a compiler or library bug).
+        // We are replacing it with a minimax approximation with a max relative error of 7.15255737e-007 compared to the C library function.
+        // On PC this has been measured to be 2x faster than the std C version.
+
+        const float absX = TMath::Abs( x );
+        const float absY = TMath::Abs( y );
+        const bool yAbsBigger = ( absY > absX );
+        float t0 = yAbsBigger ? absY : absX; // Max(absY, absX)
+        float t1 = yAbsBigger ? absX : absY; // Min(absX, absY)
+
+        if( t0 == 0.0f ) {
+            return 0.0f;
+        }
+
+        float t3 = t1 / t0;
+        float t4 = t3 * t3;
+
+        static const float c[7] = {
+            +7.2128853633444123e-03f,
+            -3.5059680836411644e-02f,
+            +8.1675882859940430e-02f,
+            -1.3374657325451267e-01f,
+            +1.9856563505717162e-01f,
+            -3.3324998579202170e-01f,
+            +1.0f
+        };
+
+        t0 = c[0];
+        t0 = t0 * t4 + c[1];
+        t0 = t0 * t4 + c[2];
+        t0 = t0 * t4 + c[3];
+        t0 = t0 * t4 + c[4];
+        t0 = t0 * t4 + c[5];
+        t0 = t0 * t4 + c[6];
+        t3 = t0 * t3;
+
+        t3 = yAbsBigger ? ( 0.5f * TMath::PI ) - t3 : t3;
+        t3 = ( x < 0.0f ) ? PI - t3 : t3;
+        t3 = ( y < 0.0f ) ? -t3 : t3;
+
+        return t3;
+    }
+
+    inline F64 TMath::ATan2( const F64 x, const F64 y ) {
+        return atan2( x, y );
     }
 
     // Arc cosine (32-bit) - input clamped to [-1, 1] to avoid silent NaN

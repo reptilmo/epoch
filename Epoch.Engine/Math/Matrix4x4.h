@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Defines.h"
 #include "../Types.h"
 
 namespace Epoch {
@@ -9,7 +10,7 @@ namespace Epoch {
     /*
      * A 4x4 matrix of floating-point values.
      */
-    class Matrix4x4 {
+    class EPOCH_API Matrix4x4 {
     public:
 
         /**
@@ -65,7 +66,7 @@ namespace Epoch {
          *
          * @param index The index to get.
          */
-        float* operator[]( const int index );
+        float& operator[]( const int index );
 
         /** Returns the a const reference to the float data of this matrix in array form. */
         const float* Data() const { return _data; }
@@ -126,7 +127,7 @@ namespace Epoch {
          *
          * @return Translation matrix.
          */
-        static Matrix4x4 Translation( const Vector3& position );
+        static void Translation( const Vector3& position, Matrix4x4* translationMatrix );
 
         /**
          * Creates and returns a Euler x-axis-angle rotation matrix using the supplied parameters.
@@ -173,7 +174,7 @@ namespace Epoch {
          *
          * @return Scale matrix.
          */
-        static Matrix4x4 Scale( const Vector3& scale );
+        static void Scale( const Vector3& scale, Matrix4x4* scaleMatrix );
 
         /**
          * Creates and returns transposed version of the supplied matrix.
@@ -185,6 +186,13 @@ namespace Epoch {
         static Matrix4x4 Transposed( const Matrix4x4& m );
 
     private:
-        float _data[16] = { 0 };
+        float _data[16] = {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f,
+        };
+
+        friend struct Quaternion;
     };
 }

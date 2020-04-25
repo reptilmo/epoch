@@ -39,7 +39,7 @@ namespace Epoch {
 
     void VulkanGraphicsPipeline::Bind( VulkanCommandBuffer* commandBuffer ) {
         if( _handle ) {
-            vkCmdBindPipeline( commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, _handle );
+            vkCmdBindPipeline( commandBuffer->Handle, VK_PIPELINE_BIND_POINT_GRAPHICS, _handle );
         } else {
             Logger::Fatal( "Attempted to bind a pipeline which does not have a handle." );
         }
@@ -50,9 +50,9 @@ namespace Epoch {
         // Viewport
         VkViewport viewport = {};
         viewport.x = 0.0f;
-        viewport.y = (F32)info.Extent.height;
+        viewport.y = 0.0f;// (F32)info.Extent.height;
         viewport.width = (F32)info.Extent.width;
-        viewport.height = -(F32)info.Extent.height;
+        viewport.height = (F32)info.Extent.height;// -(F32)info.Extent.height;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
 

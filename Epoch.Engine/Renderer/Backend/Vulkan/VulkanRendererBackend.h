@@ -3,13 +3,20 @@
 #include "../../../Types.h"
 #include "../../../Events/IEventHandler.h"
 #include "../IRendererBackend.h"
+#include "../../../Resources/StaticMesh.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#ifndef VULKAN_USE_VALIDATION
+//#define VULKAN_USE_VALIDATION 1
+#endif
+
 namespace Epoch {
 
     struct MeshUploadData;
+    struct StaticMeshRenderReferenceData;
+    struct WorldRenderableObjectTable;
 
     class ITexture;
     class TString;
@@ -104,21 +111,16 @@ namespace Epoch {
          *
          * @returns True if successful; otherwise false.
          */
-        const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData ) override;
+        const bool UploadMeshData( const MeshUploadData& data, StaticMeshRenderReferenceData* referenceData ) override;
 
         /**
          * Frees mesh data using the provided reference data.
          *
          * @param referenceData A pointer to the reference data object whose data should be released.
          */
-        void FreeMeshData( MeshRendererReferenceData* referenceData ) override;
+        void FreeMeshData( StaticMeshRenderReferenceData* referenceData ) override;
 
-        /**
-         * Adds the object referenced by the provided reference data to a list of objects to be rendered in the next frame.
-         *
-         * @param referenceData A pointer to the reference data object to be rendered.
-         */
-        void AddToFrameRenderList( const MeshRendererReferenceData* referenceData ) override;
+        void SetRenderTable( WorldRenderableObjectTable* renderTable ) override;
 
         /**
          * Processes the given event.
@@ -167,7 +169,7 @@ namespace Epoch {
         VkInstance _instance = nullptr;
         VulkanDevice* _device = nullptr;
 
-#if _DEBUG
+#if VULKAN_USE_VALIDATION
         VulkanDebugger* _debugger = nullptr;
 #endif
         // The surface (within the window) which this renderer will render to.
@@ -194,8 +196,7 @@ namespace Epoch {
         VulkanVertex3DBuffer* _vertexBuffer = nullptr;
         VulkanIndexBuffer* _indexBuffer = nullptr;
 
-        // A list of objects to be rendered in the current frame.
-        // TODO: This should probably be an object pool instead for performance reasons.
-        std::vector<const MeshRendererReferenceData*> _currentRenderList;
+
+        WorldRenderableObjectTable* _renderTable;
     };
 }

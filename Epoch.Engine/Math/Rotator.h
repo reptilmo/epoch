@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Types.h"
+
 namespace Epoch {
 
     struct Quaternion;
@@ -91,5 +93,8 @@ namespace Epoch {
          * @return The rotator.
          */
         static Rotator Zero();
+
+        static F32 ClampAxis( F32 angle );
+        static F32 NormalizeAxis( F32 angle );
     };
 }

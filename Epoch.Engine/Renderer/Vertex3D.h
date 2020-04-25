@@ -3,20 +3,30 @@
 #include <xhash>
 
 #include "../Types.h"
+#include "../Defines.h"
 #include "../Math/Vector3.h"
 #include "../Math/Vector2.h"
 
 namespace Epoch {
 
-    struct Vertex3D {
+    struct EPOCH_API Vertex3D {
 
         Vector3 Position;
         Vector3 Normal;
         Vector2 TexCoord;
         Vector3 Color;
 
+        FORCEINLINE Vertex3D() {}
+
+        FORCEINLINE Vertex3D( const Vertex3D& other ) {
+            Position = other.Position;
+            Normal = other.Normal;
+            TexCoord = other.TexCoord;
+            Color = other.Color;
+        }
+
         // Required for used in unordered_map
-        bool operator==( const Vertex3D& other ) const {
+        FORCEINLINE bool operator==( const Vertex3D& other ) const {
             return other.Position == Position && other.Normal == Normal && other.Color == Color && other.TexCoord == TexCoord;
         }
     };

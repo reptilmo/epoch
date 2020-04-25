@@ -18,13 +18,13 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -119,11 +119,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Assets\Image\ImageUtilities.cpp" />
+    <ClCompile Include="Assets\MaterialData.cpp" />
+    <ClCompile Include="Assets\StaticMeshData.cpp" />
     <ClCompile Include="Assets\StaticMesh\Loaders\OBJLoader.cpp" />
-    <ClCompile Include="Assets\StaticMesh\StaticMesh.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Events\Event.cpp" />
     <ClCompile Include="Events\EventManager.cpp" />
+    <ClCompile Include="FileSystem\FileHandle.cpp" />
+    <ClCompile Include="Game.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Math\Matrix4x4.cpp" />
@@ -163,17 +166,25 @@
     <ClCompile Include="Renderer\Frontend\RendererFrontEnd.cpp" />
     <ClCompile Include="Renderer\Material.cpp" />
     <ClCompile Include="Renderer\TextureCache.cpp" />
+    <ClCompile Include="Resources\StaticMesh.cpp" />
     <ClCompile Include="String\StringUtilities.cpp" />
     <ClCompile Include="String\TName.cpp" />
     <ClCompile Include="String\TString.cpp" />
+    <ClCompile Include="Time\Clock.cpp" />
+    <ClCompile Include="World\Entity.cpp" />
+    <ClCompile Include="World\EntityComponents\EntityComponent.cpp" />
+    <ClCompile Include="World\EntityComponents\StaticMeshEntityComponent.cpp" />
+    <ClCompile Include="World\Level.cpp" />
+    <ClCompile Include="World\WObject.cpp" />
+    <ClCompile Include="World\World.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Assets\AssetData.h" />
-    <ClInclude Include="Assets\AssetLoadedEvent.h" />
+    <ClInclude Include="Assets\Asset.h" />
+    <ClInclude Include="Assets\MaterialData.h" />
+    <ClInclude Include="Assets\StaticMeshData.h" />
     <ClInclude Include="Assets\StaticMesh\Loaders\OBJLoader.h" />
-    <ClInclude Include="Assets\StaticMesh\StaticMesh.h" />
-    <ClInclude Include="Assets\StaticMesh\StaticMeshAssetData.h" />
     <ClInclude Include="Containers\LinkedList.h" />
+    <ClInclude Include="Containers\List.h" />
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Events\Event.h" />
@@ -181,6 +192,10 @@
     <ClInclude Include="Events\IEventHandler.h" />
     <ClInclude Include="External\stb_image\stb_image.h" />
     <ClInclude Include="External\tiny_obj_loader\tiny_obj_loader.h" />
+    <ClInclude Include="FileSystem\FileHandle.h" />
+    <ClInclude Include="FileSystem\FileSystem.h" />
+    <ClInclude Include="FileSystem\IBinarySerializable.h" />
+    <ClInclude Include="Game.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Math\Matrix4x4.h" />
     <ClInclude Include="Math\Quaternion.h" />
@@ -228,7 +243,7 @@
     <ClInclude Include="Renderer\IShader.h" />
     <ClInclude Include="Renderer\IUniformBuffer.h" />
     <ClInclude Include="Renderer\Material.h" />
-    <ClInclude Include="Renderer\MeshData.h" />
+    <ClInclude Include="Renderer\RenderData.h" />
     <ClInclude Include="Renderer\RenderPassData.h" />
     <ClInclude Include="Renderer\UniformObject.h" />
     <ClInclude Include="Renderer\TextureCache.h" />
@@ -236,13 +251,21 @@
     <ClInclude Include="Resources\IImage.h" />
     <ClInclude Include="Resources\IRenderTarget.h" />
     <ClInclude Include="Resources\ITexture.h" />
+    <ClInclude Include="Resources\StaticMesh.h" />
     <ClInclude Include="String\StringUtilities.h" />
     <ClInclude Include="String\TName.h" />
     <ClInclude Include="String\TString.h" />
+    <ClInclude Include="Time\Clock.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanImage.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRendererBackend.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanUtilities.h" />
+    <ClInclude Include="World\Entity.h" />
+    <ClInclude Include="World\EntityComponents\EntityComponent.h" />
+    <ClInclude Include="World\EntityComponents\StaticMeshEntityComponent.h" />
+    <ClInclude Include="World\Level.h" />
+    <ClInclude Include="World\WObject.h" />
+    <ClInclude Include="World\World.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -8,8 +8,9 @@ struct GLFWwindow;
 
 namespace Epoch {
 
-    class Engine;
     class IWindow;
+    class Engine;
+    class Clock;
 
     /**
      * A specialized event used to signal a window resize having occurred.
@@ -74,6 +75,9 @@ namespace Epoch {
          * @returns A pointer to the window.
          */
         static IWindow* CreateWindow( const char* applicationName, U32 width, U32 height );
+
+        static U32 Cycles();
+        static U64 Cycles64();
     public:
 
         /**
@@ -137,6 +141,8 @@ namespace Epoch {
     private:
         Engine* _engine;
         GLFWwindow* _window;
+        Clock* _clock;
+        U64 _lastTime;
 
         friend class TGLFWWindow;
     };

@@ -6,9 +6,11 @@ namespace Epoch {
 
     enum class MaterialType;
     struct MeshUploadData;
-    struct MeshRendererReferenceData;
+    struct StaticMeshRenderReferenceData;
+    class StaticMeshEntityComponent;
 
     class Engine;
+    class World;
     class TString;
     class IRendererBackend;
     class TextureCache;
@@ -46,11 +48,11 @@ namespace Epoch {
          *
          * @returns True on success, false on failure. Returning false crashes the application.
          */
-        static const bool Frame( const F32 deltaTime );
+        static const bool Frame( World* world, const F32 deltaTime );
 
-        static const bool UploadMeshData( const MeshUploadData& data, MeshRendererReferenceData* referenceData );
+        static const bool UploadMeshData( const MeshUploadData& data, StaticMeshRenderReferenceData* referenceData );
 
-        static void FreeMeshData( MeshRendererReferenceData* referenceData );
+        static void FreeMeshData( StaticMeshRenderReferenceData* referenceData );
 
         /**
          * Obtains a texture reference to the provided name. Path, for now, is required.
@@ -71,6 +73,8 @@ namespace Epoch {
         // Remove the ability to instantiate this class.
         RendererFrontEnd() noexcept {}
         ~RendererFrontEnd() noexcept {}
+
+        static void sortByMaterialShader( StaticMeshEntityComponent** references, I32 count );
 
     private:
 

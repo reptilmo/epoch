@@ -1,8 +1,8 @@
 #pragma once
 
-#include <vector>
 #include <vulkan/vulkan.h>
 
+#include "../../../Types.h"
 #include "../../ICommandBuffer.h"
 #include "../../../Defines.h"
 
@@ -29,20 +29,20 @@ namespace Epoch {
     class VulkanCommandBuffer : public ICommandBuffer {
         friend class VulkanQueue;
     public:
-
+        VkCommandBuffer Handle;
     public:
         VulkanCommandBuffer( VkCommandBuffer handle, VulkanCommandPool* owner, const bool isPrimary );
         ~VulkanCommandBuffer();
 
         /**
          * Begins recording of this command buffer.
-         * 
+         *
          * @param isSingleUse Specifies this command buffer will only be used once and will be reset and recorded again between each submission. Default: false
          * @param isRenderPassContinue Specifies that a secondary buffer is considered to be entirely inside a render pass. Default: false
          * @param isSimultaneousUse Specifies that the buffer can be resubmitted to a queue while it is in pending state and recorded into multiple primary buffers. Default: false
          */
         void Begin( const bool isSingleUse = false, const bool isRenderPassContinue = false, const bool isSimultaneousUse = false );
-        
+
         /**
          * Ends recording of this command buffer. From here, the buffer may be submitted to a queue for execution.
          */
@@ -56,10 +56,9 @@ namespace Epoch {
         void UpdateSubmitted();
         void Reset();
 
-        VkCommandBuffer GetHandle() { return _handle; }
-
-        const std::vector<VulkanSemaphore*>& GetWaitSemaphores() { return _waitSemaphores; }
-        const std::vector<VkPipelineStageFlags>& GetWaitFlags() { return _waitFlags; }
+        const U32 GetWaitSemaphoreCount() const { return _waitSemaphoreCount; }
+        VulkanSemaphore* GetWaitSemaphore( const U32 index ) { return _waitSemaphores[index]; }
+        const VkPipelineStageFlags* GetWaitFlags() const { return _waitFlags; }
 
         FORCEINLINE const bool IsInRenderPass() const {
             return _state == CommandBufferState::InRenderPass;
@@ -83,12 +82,16 @@ namespace Epoch {
 
     private:
         bool _isPrimary;
-        VkCommandBuffer _handle;
         VulkanCommandPool* _owner;
         CommandBufferState _state;
         VulkanRenderPass* _currentRenderPass;
-        std::vector<VkPipelineStageFlags> _waitFlags;
-        std::vector<VulkanSemaphore*> _waitSemaphores;
-        std::vector<VulkanSemaphore*> _submittedWaitSemaphores;
+
+        U32 _waitSemaphoreCount = 0;
+        U32 _waitSemaphoreAllocatedCount = 0;
+        VulkanSemaphore** _waitSemaphores = nullptr;
+
+        U32 _waitFlagCount = 0;
+        U32 _waitFlagAllocatedCount = 0;
+        VkPipelineStageFlags* _waitFlags = nullptr;
     };
 }

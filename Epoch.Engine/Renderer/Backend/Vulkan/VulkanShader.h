@@ -84,23 +84,34 @@ namespace Epoch {
         bool _needsReset = true;
         TString _renderPassName;
 
-        std::vector<VkDescriptorPool> _objectDescriptorPools;
-        VkDescriptorSetLayout _objectDescriptorSetLayout;
-        std::vector<std::vector<VkDescriptorSet>> _objectDescriptorSets; // one per frame, per object
-
-        std::vector<VkDescriptorPool> _globalDescriptorPools;
+        // Global descriptors (one pool/set per frame)
+        U32 _globalDescriptorPoolCount;
+        VkDescriptorPool* _globalDescriptorPools;
         VkDescriptorSetLayout _globalDescriptorSetLayout;
-        std::vector<VkDescriptorSet> _globalDescriptorSets;
-        
-        std::vector<VulkanTextureSampler*> _textureSamplers;
+        U32 _globalDescriptorSetFrameCount;
+        VkDescriptorSet* _globalDescriptorSets; // one per frame
+
+        // Object descriptors (one pool/frame, one set per frame per object)
+        U32 _objectDescriptorPoolCount;
+        VkDescriptorPool* _objectDescriptorPools;
+        VkDescriptorSetLayout _objectDescriptorSetLayout;
+
+        U32 _objectDescriptorSetFrameCount;
+        U32 _objectDescriptorSetObjectCount;
+        VkDescriptorSet** _objectDescriptorSets; // one per frame, per object
+
+        U32 _textureSamplerCount;
+        VulkanTextureSampler** _textureSamplers;
 
         VulkanGraphicsPipeline* _graphicsPipeline;
 
         // 1 per swap chain image
-        std::vector<VulkanBuffer<Epoch::GlobalUniformObject>*> _globalUniformBuffers;
-        std::vector<VulkanBuffer<Epoch::UnlitUniformObject>*> _objectUniformBuffers;
-        std::vector<UnlitUniformObject> _objectUbos;
-        std::vector<GlobalUniformObject> _globalUbos;
+        U32 _globalUBOCount;
+        U32 _objectUBOCount;
+        VulkanBuffer<Epoch::GlobalUniformObject>** _globalUniformBuffers;
+        VulkanBuffer<Epoch::UnlitUniformObject>** _objectUniformBuffers;
+        UnlitUniformObject* _objectUbos;
+        GlobalUniformObject* _globalUbos;
 
         U32 _imageCount;
         VulkanDevice* _device;

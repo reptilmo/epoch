@@ -7,18 +7,19 @@ namespace Epoch {
     }
 
     Transform::Transform( const Transform& other ) {
-        position = other.position;
-        rotation = other.rotation;
-        scale = other.scale;
+        Position = other.Position;
+        Rotation = other.Rotation;
+        Scale = other.Scale;
     }
 
     Matrix4x4 Transform::GetTransformation() const {
 
         // SQT/SRT
-        Matrix4x4 s = Matrix4x4::Scale( scale );
-        Matrix4x4 q = rotation.ToMatrix4x4();
-        Matrix4x4 t = Matrix4x4::Translation( position );
+        Matrix4x4 scaleMatrix, quatMatrix, translationMatrix;
+        Matrix4x4::Scale( Scale, &scaleMatrix );
+        Rotation.ToMatrix4x4( &quatMatrix );
+        Matrix4x4::Translation( Position, &translationMatrix );
 
-        return t * q * s;
+        return translationMatrix * quatMatrix * scaleMatrix;
     }
 }

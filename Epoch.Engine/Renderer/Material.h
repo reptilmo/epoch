@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../String/TString.h"
+#include "../Math/Vector3.h"
 
 namespace Epoch {
 
@@ -13,6 +14,8 @@ namespace Epoch {
         Physical,
         Custom
     };
+
+    
 
     /**
      * The base material for all materials.
