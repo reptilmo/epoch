@@ -2,6 +2,7 @@
 
 #include "../Defines.h"
 #include "../Types.h"
+#include "../Memory/Memory.h"
 
 namespace Epoch {
 
@@ -10,7 +11,7 @@ namespace Epoch {
     /*
      * A 4x4 matrix of floating-point values.
      */
-    class EPOCH_API Matrix4x4 {
+    ALIGN( 16 ) class EPOCH_API Matrix4x4 {
     public:
 
         /**
@@ -50,7 +51,7 @@ namespace Epoch {
          *
          * @return A reference to this multiplied matrix.
          */
-        Matrix4x4 operator*=( const Matrix4x4& b );
+        Matrix4x4& operator*=( const Matrix4x4& b );
 
         /**
          * Sets the values of this matrix to those of the one provided.
@@ -186,13 +187,79 @@ namespace Epoch {
         static Matrix4x4 Transposed( const Matrix4x4& m );
 
     private:
-        float _data[16] = {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f,
-        };
+        ALIGN( 16 ) float _data[16];
 
         friend struct Quaternion;
     };
+
+    FORCEINLINE Matrix4x4::Matrix4x4() {
+        TMemory::MemZero( _data, ( sizeof( float ) * 16 ) );
+
+        // Default to identity.
+        _data[0] = 1.0f;
+        _data[5] = 1.0f;
+        _data[10] = 1.0f;
+        _data[15] = 1.0f;
+    }
+
+    FORCEINLINE Matrix4x4::Matrix4x4( const Matrix4x4& other ) {
+        /*for( U32 i = 0; i < 16; ++i ) {
+            _data[i] = other._data[i];
+        }*/
+        TMemory::Memcpy( _data, other._data, sizeof( float ) * 16 );
+    }
+
+    FORCEINLINE Matrix4x4 Matrix4x4::Transpose() {
+        *this = Matrix4x4::Transposed( *this );
+        return *this;
+    }
+
+    FORCEINLINE Matrix4x4& Matrix4x4::operator*=( const Matrix4x4& b ) {
+
+        *this = ( *this ) * b;
+        return *this;
+    }
+
+    FORCEINLINE Matrix4x4 Matrix4x4::operator=( const Matrix4x4& m ) {
+        for( U32 i = 0; i < 16; ++i ) {
+            _data[i] = m._data[i];
+        }
+        //TMemory::Memcpy( _data, m._data, sizeof( float ) * 16 );
+        return *this;
+    }
+
+    FORCEINLINE float& Matrix4x4::operator[]( const int index ) {
+        //ASSERT_MSG( index >= 0 && index <= 15, "Matrix4x4[]: Index out of range" );
+        return _data[index];
+    }
+
+    FORCEINLINE Matrix4x4 Matrix4x4::Identity() {
+        Matrix4x4 m;
+        m[0] = 1.0f;
+        m[5] = 1.0f;
+        m[10] = 1.0f;
+        m[15] = 1.0f;
+        return m;
+    }
+
+    FORCEINLINE Matrix4x4 Matrix4x4::operator*( const Matrix4x4& b ) const {
+        Matrix4x4 dst;
+
+        const F32* m1Ptr = b._data;
+        const F32* m2Ptr = _data;
+        F32* dstPtr = dst._data;
+
+        for( I32 i = 0; i < 4; ++i ) {
+            for( I32 j = 0; j < 4; ++j ) {
+                *dstPtr =
+                    m1Ptr[0] * m2Ptr[0 + j] +
+                    m1Ptr[1] * m2Ptr[4 + j] +
+                    m1Ptr[2] * m2Ptr[8 + j] +
+                    m1Ptr[3] * m2Ptr[12 + j];
+                dstPtr++;
+            }
+            m1Ptr += 4;
+        }
+        return dst;
+    }
 }

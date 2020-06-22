@@ -4,7 +4,6 @@
 #include "../../Types.h"
 #include "../../Engine.h"
 #include "../../Memory/Memory.h"
-#include "../../Time/Clock.h"
 #include "../../Logger.h"
 
 #include "WindowsWindow.h"
@@ -17,19 +16,31 @@ namespace Epoch {
 
     LRESULT CALLBACK ApplicationWindowProcedure( HWND hwnd, U32 msg, WPARAM wParam, LPARAM lParam );
 
+    WindowsApplication* WindowsApplication::CreateWindowsApplication( const HINSTANCE handle, const HICON iconHandle ) {
+        App = new WindowsApplication( handle, iconHandle );
+
+        return App;
+    }
+
+    const bool WindowsApplication::Initialize() {
+        _engine = new Engine( this );
+
+        return true;
+    }
+
     void WindowsApplication::Run() {
         _clock = new Clock( true );
         if( _engine ) {
             _engine->Run();
         }
 
-        _lastTime = _clock->GetTime();
+        _lastTime = _clock.GetTime();
 
         // MAIN GAME LOOP
         while( !_mainWindow->CloseRequested() ) {
 
-            U64 currentTime = _clock->GetTime();
-            F32 delta = (F32)( (F64)currentTime - (F64)_lastTime );
+            U64 currentTime = _clock.GetTime();
+            F32 delta = (F32)( currentTime - _lastTime );
             delta *= 0.001f; // Convert to seconds.
 
             PumpMessages( delta );
@@ -45,18 +56,6 @@ namespace Epoch {
 
         // Post a message to actually destroy the window.
         PostMessageW( (HWND)_mainWindow->GetHandle(), WM_DESTROY, 0, 0 );
-    }
-
-    WindowsApplication* WindowsApplication::CreateWindowsApplication( const HINSTANCE handle, const HICON iconHandle ) {
-        App = new WindowsApplication( handle, iconHandle );
-
-        return App;
-    }
-
-    const bool WindowsApplication::Initialize() {
-        _engine = new Engine( this );
-
-        return true;
     }
 
     void WindowsApplication::PumpMessages( const F32 deltaTime ) {
@@ -85,7 +84,20 @@ namespace Epoch {
     }
 
     WindowsApplication::~WindowsApplication() {
+        _applicationName.Clear();
 
+        if( _engine ) {
+            _engine->Shutdown();
+            delete _engine;
+            _engine = nullptr;
+        }
+
+        if( _mainWindow ) {
+            delete _mainWindow;
+            _mainWindow = nullptr;
+        }
+
+        U64 _lastTime = 0;
     }
 
     I32 WindowsApplication::ProcessMessage( HWND hwnd, U32 msg, WPARAM wParam, LPARAM lParam ) {
@@ -112,18 +124,16 @@ namespace Epoch {
             U16 height = HIWORD( lParam );
 
             // TODO: Detect which window was resized.
-            WindowResizedEvent* resizeEvent = new WindowResizedEvent( _mainWindow, 0, 0, (U32)width, (U32)height );
-            resizeEvent->Post( true );
+            WindowResizedEvent resizeEvent( _mainWindow, 0, 0, (U32)width, (U32)height );
+            resizeEvent.Post( true );
             break;
         }
 
         case WM_KEYDOWN:
-            // TODO: put keyboard input hooks here.
-            switch( wParam ) {
-            case VK_ESCAPE:
-                _mainWindow->RequestClose();
-                break;
-            }
+            handleKeyDown( (Key)wParam );
+            break;
+        case WM_KEYUP:
+            handleKeyUp( (Key)wParam );
             break;
         }
 
@@ -132,6 +142,24 @@ namespace Epoch {
 
     IWindow* WindowsApplication::GetApplicationWindow() {
         return static_cast<IWindow*>( _mainWindow );
+    }
+
+    void WindowsApplication::handleKeyDown( Key key ) {
+        KeyDownEvent event( key, this );
+        event.Post( true );
+        switch( key ) {
+
+            // TODO: Temporary convenience - remove later
+        case Key::ESCAPE: {
+            _mainWindow->RequestClose();
+            break;
+        }
+        }
+    }
+
+    void WindowsApplication::handleKeyUp( Key key ) {
+        KeyUpEvent event( key, this );
+        event.Post( true );
     }
 
     const bool WindowsApplication::registerClass( const HINSTANCE handle, const HICON iconHandle ) {

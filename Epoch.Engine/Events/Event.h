@@ -10,6 +10,8 @@ namespace Epoch {
         UNKNOWN,
         WINDOW_RESIZED,
         ASSET_LOADED,
+        KEY_DOWN,
+        KEY_UP,
 
         EVENT_TYPE_MAX_EVENT_ID
     };

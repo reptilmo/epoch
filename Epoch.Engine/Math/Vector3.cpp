@@ -47,7 +47,7 @@ namespace Epoch {
         return *this;
     }
 
-    Vector3 Vector3::Cross( const Vector3& other ) {
+    Vector3& Vector3::Cross( const Vector3& other ) {
         X = Y * other.Z - Z * other.Y;
         Y = Z * other.X - X * other.Z;
         Z = X * other.Y - Y * other.X;

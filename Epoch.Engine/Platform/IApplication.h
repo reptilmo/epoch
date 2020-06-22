@@ -65,16 +65,16 @@ namespace Epoch {
     public:
 
         /**
-         * Runs this application.
-         */
-        virtual void Run() = 0;
-
-        /**
          * Performs initialization routines on this application.
          *
          * @returns True on success; otherwise false.
          */
         virtual const bool Initialize() = 0;
+
+        /**
+         * Runs this application.
+         */
+        virtual void Run() = 0;
 
         /**
          * Performs platform-specific message pumping. Typically called internally by the application.

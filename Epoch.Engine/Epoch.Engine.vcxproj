@@ -171,9 +171,11 @@
     <ClCompile Include="String\TString.cpp" />
     <ClCompile Include="Time\Clock.cpp" />
     <ClCompile Include="World\Entity.cpp" />
+    <ClCompile Include="World\Entities\CameraEntity.cpp" />
     <ClCompile Include="World\EntityComponents\EntityComponent.cpp" />
     <ClCompile Include="World\EntityComponents\StaticMeshEntityComponent.cpp" />
     <ClCompile Include="World\Level.cpp" />
+    <ClCompile Include="World\UpdateManager.cpp" />
     <ClCompile Include="World\WObject.cpp" />
     <ClCompile Include="World\World.cpp" />
   </ItemGroup>
@@ -195,11 +197,13 @@
     <ClInclude Include="FileSystem\FileSystem.h" />
     <ClInclude Include="FileSystem\IBinarySerializable.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="Input\Input.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Math\Matrix4x4.h" />
     <ClInclude Include="Math\Quaternion.h" />
     <ClInclude Include="Math\Rectangle2D.h" />
     <ClInclude Include="Math\Rotator.h" />
+    <ClInclude Include="Math\SSEMath.h" />
     <ClInclude Include="Math\StandardUniformBufferObject.h" />
     <ClInclude Include="Math\TMath.h" />
     <ClInclude Include="Math\Transform.h" />
@@ -259,8 +263,10 @@
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanRendererBackend.h" />
     <ClInclude Include="Renderer\Backend\Vulkan\VulkanUtilities.h" />
     <ClInclude Include="World\Entity.h" />
+    <ClInclude Include="World\Entities\CameraEntity.h" />
     <ClInclude Include="World\EntityComponents\EntityComponent.h" />
     <ClInclude Include="World\EntityComponents\StaticMeshEntityComponent.h" />
+    <ClInclude Include="World\UpdateManager.h" />
     <ClInclude Include="World\Level.h" />
     <ClInclude Include="World\WObject.h" />
     <ClInclude Include="World\World.h" />

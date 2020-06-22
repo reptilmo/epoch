@@ -38,9 +38,8 @@
 
 #include "VulkanRendererBackend.h"
 
-#if VULKAN_USE_VALIDATION
 #include "VulkanDebugger.h"
-#endif
+
 
 namespace Epoch {
 
@@ -57,15 +56,16 @@ namespace Epoch {
         }
     }
 
-    const bool VulkanRendererBackend::Initialize() {
+    const bool VulkanRendererBackend::Initialize( const bool enableValidation ) {
+        _validationEnabled = enableValidation;
         Logger::Trace( "Initializing Vulkan renderer backend..." );
 
         createInstance();
 
         // Create debugger
-#if VULKAN_USE_VALIDATION
-        _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
-#endif
+        if( _validationEnabled ) {
+            _debugger = new VulkanDebugger( _instance, VulkanDebuggerLevel::ERROR | VulkanDebuggerLevel::WARNING );
+        }
 
         IWindow* applicationWindow = _application->GetApplicationWindow();
 
@@ -73,7 +73,7 @@ namespace Epoch {
         VulkanPlatform::CreateSurface( applicationWindow->GetHandle(), _instance, &_surface );
 
         // Create VulkanDevice
-        _device = new VulkanDevice( _instance, _requiredValidationLayers, _surface );
+        _device = new VulkanDevice( _instance, enableValidation, _requiredValidationLayers, _surface );
 
         // HACK: This is here until the platform layer is removed.
         _device->FramebufferSize = applicationWindow->GetFramebufferExtent();
@@ -152,12 +152,12 @@ namespace Epoch {
 
         vkDestroySurfaceKHR( _instance, _surface, nullptr );
 
-#if VULKAN_USE_VALIDATION
-        if( _debugger ) {
-            delete _debugger;
-            _debugger = nullptr;
+        if( _validationEnabled ) {
+            if( _debugger ) {
+                delete _debugger;
+                _debugger = nullptr;
+            }
         }
-#endif
 
         if( _device ) {
             delete _device;
@@ -391,39 +391,39 @@ namespace Epoch {
         instanceCreateInfo.ppEnabledExtensionNames = requiredExtensions.Data();
 
         // Validation layers
-#ifdef VULKAN_USE_VALIDATION
-        _requiredValidationLayers.push_back( "VK_LAYER_KHRONOS_validation" );
+        if( _validationEnabled ) {
+            _requiredValidationLayers.push_back( "VK_LAYER_KHRONOS_validation" );
 
-        // Get available layers.
-        U32 availableLayerCount = 0;
-        VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, nullptr ) );
-        std::vector<VkLayerProperties> availableLayers( availableLayerCount );
-        VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, availableLayers.data() ) );
+            // Get available layers.
+            U32 availableLayerCount = 0;
+            VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, nullptr ) );
+            std::vector<VkLayerProperties> availableLayers( availableLayerCount );
+            VK_CHECK( vkEnumerateInstanceLayerProperties( &availableLayerCount, availableLayers.data() ) );
 
-        // Verify that all required layers are available.
-        bool success = true;
-        for( U32 i = 0; i < (U32)_requiredValidationLayers.size(); ++i ) {
-            bool found = false;
-            for( U32 j = 0; j < availableLayerCount; ++j ) {
-                if( strcmp( _requiredValidationLayers[i], availableLayers[j].layerName ) == 0 ) {
-                    found = true;
+            // Verify that all required layers are available.
+            bool success = true;
+            for( U32 i = 0; i < (U32)_requiredValidationLayers.size(); ++i ) {
+                bool found = false;
+                for( U32 j = 0; j < availableLayerCount; ++j ) {
+                    if( strcmp( _requiredValidationLayers[i], availableLayers[j].layerName ) == 0 ) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if( !found ) {
+                    success = false;
+                    Logger::Fatal( "Required validation layer is missing: %s", _requiredValidationLayers[i] );
                     break;
                 }
             }
 
-            if( !found ) {
-                success = false;
-                Logger::Fatal( "Required validation layer is missing: %s", _requiredValidationLayers[i] );
-                break;
-            }
+            instanceCreateInfo.enabledLayerCount = (U32)_requiredValidationLayers.size();
+            instanceCreateInfo.ppEnabledLayerNames = _requiredValidationLayers.data();
+        } else {
+            instanceCreateInfo.enabledLayerCount = 0;
+            instanceCreateInfo.ppEnabledLayerNames = nullptr;
         }
-
-        instanceCreateInfo.enabledLayerCount = (U32)_requiredValidationLayers.size();
-        instanceCreateInfo.ppEnabledLayerNames = _requiredValidationLayers.data();
-#else
-        instanceCreateInfo.enabledLayerCount = 0;
-        instanceCreateInfo.ppEnabledLayerNames = nullptr;
-#endif
 
         // Create instance
         VK_CHECK( vkCreateInstance( &instanceCreateInfo, nullptr, &_instance ) );

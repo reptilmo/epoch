@@ -24,12 +24,13 @@ namespace Epoch {
     const bool RendererFrontEnd::Initialize( Engine* engine ) {
 
         _engine = engine;
-        Logger::Log( "Created renderer front end." );
+        const bool validationEnabled = false;
+        Logger::Log( "Created renderer front end. Renderer validation %s enabled.", validationEnabled ? "IS" : "IS NOT" );
 
         // TODO: Choose this from configuration instead of hardcoding it.
         // TODO: Should probably be created via factory to prevent this class from knowing about the specific type.
         _backend = new VulkanRendererBackend( _engine->GetApplication() );
-        _backend->Initialize();
+        _backend->Initialize( validationEnabled );
 
         _textureCache = new TextureCache();
         _textureCache->Initialize();
