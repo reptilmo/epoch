@@ -189,6 +189,12 @@
     <ClCompile Include="Platform\Windows\WindowsVulkanPlatform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="World\Entities\CameraEntity.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="World\UpdateManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Types.h">
@@ -447,6 +453,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Platform\VulkanPlatform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\Input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="World\Entities\CameraEntity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="World\UpdateManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\SSEMath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

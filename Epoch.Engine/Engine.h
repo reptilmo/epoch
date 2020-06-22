@@ -45,6 +45,8 @@ namespace Epoch {
          */
         const bool OnLoop( const F32 deltaTime );
 
+        void Shutdown();
+
     private:
         IApplication* _application;
         World* _world;

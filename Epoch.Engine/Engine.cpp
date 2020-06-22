@@ -47,4 +47,8 @@ namespace Epoch {
 
         return true;
     }
+
+    void Engine::Shutdown() {
+
+    }
 }

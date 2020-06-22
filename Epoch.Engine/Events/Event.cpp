@@ -10,7 +10,7 @@ namespace Epoch {
     }
 
     void Event::Post( const bool immediate ) {
-        EventManager::Post( this, immediate );
+        EventManager::Post( *this, immediate );
     }
 
     void Event::Listen( const EventType type, IEventHandler* handler ) {

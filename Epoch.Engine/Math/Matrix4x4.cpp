@@ -8,61 +8,7 @@
 
 namespace Epoch {
 
-    Matrix4x4::Matrix4x4() {
-
-    }
-
-    Matrix4x4::Matrix4x4( const Matrix4x4& other ) {
-        TMemory::Memcpy( _data, other._data, sizeof( float ) * 16 );
-    }
-
-    Matrix4x4 Matrix4x4::Transpose() {
-        *this = Matrix4x4::Transposed( *this );
-        return *this;
-    }
-
-    Matrix4x4 Matrix4x4::operator*( const Matrix4x4& b ) const {
-        Matrix4x4 m = *this;
-        return m *= b;
-    }
-
-    Matrix4x4 Matrix4x4::operator*=( const Matrix4x4& b ) {
-        F32 n[16];
-        n[0] = b._data[0] * _data[0] + b._data[1] * _data[4] + b._data[2] * _data[8] + b._data[3] * _data[12];
-        n[1] = b._data[0] * _data[1] + b._data[1] * _data[5] + b._data[2] * _data[9] + b._data[3] * _data[13];
-        n[2] = b._data[0] * _data[2] + b._data[1] * _data[6] + b._data[2] * _data[10] + b._data[3] * _data[14];
-        n[3] = b._data[0] * _data[3] + b._data[1] * _data[7] + b._data[2] * _data[11] + b._data[3] * _data[15];
-        n[4] = b._data[4] * _data[0] + b._data[5] * _data[4] + b._data[6] * _data[8] + b._data[7] * _data[12];
-        n[5] = b._data[4] * _data[1] + b._data[5] * _data[5] + b._data[6] * _data[9] + b._data[7] * _data[13];
-        n[6] = b._data[4] * _data[2] + b._data[5] * _data[6] + b._data[6] * _data[10] + b._data[7] * _data[14];
-        n[7] = b._data[4] * _data[3] + b._data[5] * _data[7] + b._data[6] * _data[11] + b._data[7] * _data[15];
-        n[8] = b._data[8] * _data[0] + b._data[9] * _data[4] + b._data[10] * _data[8] + b._data[11] * _data[12];
-        n[9] = b._data[8] * _data[1] + b._data[9] * _data[5] + b._data[10] * _data[9] + b._data[11] * _data[13];
-        n[10] = b._data[8] * _data[2] + b._data[9] * _data[6] + b._data[10] * _data[10] + b._data[11] * _data[14];
-        n[11] = b._data[8] * _data[3] + b._data[9] * _data[7] + b._data[10] * _data[11] + b._data[11] * _data[15];
-        n[12] = b._data[12] * _data[0] + b._data[13] * _data[4] + b._data[14] * _data[8] + b._data[15] * _data[12];
-        n[13] = b._data[12] * _data[1] + b._data[13] * _data[5] + b._data[14] * _data[9] + b._data[15] * _data[13];
-        n[14] = b._data[12] * _data[2] + b._data[13] * _data[6] + b._data[14] * _data[10] + b._data[15] * _data[14];
-        n[15] = b._data[12] * _data[3] + b._data[13] * _data[7] + b._data[14] * _data[11] + b._data[15] * _data[15];
-
-        TMemory::Memcpy( _data, n, sizeof( float ) * 16 );
-
-        return *this;
-    }
-
-    Matrix4x4 Matrix4x4::operator=( const Matrix4x4& m ) {
-        TMemory::Memcpy( _data, m._data, sizeof( float ) * 16 );
-        return *this;
-    }
-
-    float& Matrix4x4::operator[]( const int index ) {
-        //ASSERT_MSG( index >= 0 && index <= 15, "Matrix4x4[]: Index out of range" );
-        return _data[index];
-    }
-
-    Matrix4x4 Matrix4x4::Identity() {
-        return Matrix4x4();
-    }
+    
 
     Matrix4x4 Matrix4x4::Orthographic( const float left, const float right, const float bottom, const float top, const float nearClip, const float farClip ) {
         Matrix4x4 m;

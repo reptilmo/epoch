@@ -5,6 +5,7 @@
 #include "../String/TString.h"
 #include "../Math/Transform.h"
 #include "../Containers/List.h"
+#include "UpdateManager.h"
 #include "WObject.h"
 
 namespace Epoch {
@@ -12,7 +13,7 @@ namespace Epoch {
     class Level;
     class EntityComponent;
 
-    class EPOCH_API Entity : public WObject {
+    class EPOCH_API Entity : public WObject, public IUpdatable {
     public:
         TString Name;
     public:
@@ -37,6 +38,11 @@ namespace Epoch {
         void AddComponentAt( EntityComponent* component, const U32 index );
 
         const bool RemoveComponent( EntityComponent* component );
+
+        /**
+         * Called if this object is opted-into updates via UpdateManager::StartListening()
+         */
+        virtual void Update( const F32 deltaTime ) override {}
 
         /*
          Removes the child entity at the given index. If no child is removed, nullptr is returned.

@@ -8,10 +8,6 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#ifndef VULKAN_USE_VALIDATION
-//#define VULKAN_USE_VALIDATION 1
-#endif
-
 namespace Epoch {
 
     struct MeshUploadData;
@@ -28,10 +24,7 @@ namespace Epoch {
     class VulkanImage;
     class VulkanTexture;
     class VulkanUniformBuffer;
-
-#if _DEBUG
     class VulkanDebugger;
-#endif
     class VulkanDevice;
     class VulkanSwapchain;
     class VulkanFence;
@@ -59,6 +52,11 @@ namespace Epoch {
         ~VulkanRendererBackend();
 
         /**
+         * Indicates if validation is enabled for this renderer.
+         */
+        const bool ValidationEnabled() const { return _validationEnabled; }
+
+        /**
          * Obtains a pointer to the Vulkan Device.
          */
         VulkanDevice* GetDevice() { return _device; }
@@ -71,9 +69,11 @@ namespace Epoch {
         /**
          * Initializes this renderer.
          *
+         * @param enableValidation Indicates if validation should be enabled for this renderer. Has a high performance cost. Should only be used for debugging.
+         *
          * @returns True if successful; otherwise false.
          */
-        const bool Initialize() override;
+        const bool Initialize( const bool enableValidation ) override;
 
         /**
          * Flags this renderer as shut down and begins the shutdown process. Must be invoked before Destroy or delete.
@@ -161,6 +161,7 @@ namespace Epoch {
         void createBuffers();
     private:
         bool _isShutDown = false;
+        bool _validationEnabled;
         U32 _currentImageIndex = 0;
         IApplication* _application = nullptr;
 
@@ -169,9 +170,8 @@ namespace Epoch {
         VkInstance _instance = nullptr;
         VulkanDevice* _device = nullptr;
 
-#if VULKAN_USE_VALIDATION
         VulkanDebugger* _debugger = nullptr;
-#endif
+
         // The surface (within the window) which this renderer will render to.
         VkSurfaceKHR _surface = nullptr;
 

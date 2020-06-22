@@ -14,9 +14,10 @@
 
 namespace Epoch {
 
-    VulkanDevice::VulkanDevice( VkInstance instance, const std::vector<const char*>& requiredValidationLayers, VkSurfaceKHR surface ) {
+    VulkanDevice::VulkanDevice( VkInstance instance, const bool validationEnabled, const std::vector<const char*>& requiredValidationLayers, VkSurfaceKHR surface ) {
         _instance = instance;
         _surface = surface;
+        _validationEnabled = validationEnabled;
 
         selectPhysicalDevice();
         createLogicalDevice( requiredValidationLayers );
@@ -255,13 +256,13 @@ namespace Epoch {
         };
         deviceCreateInfo.ppEnabledExtensionNames = requiredExtensions;
 
-#if VULKAN_USE_VALIDATION
-        deviceCreateInfo.enabledLayerCount = (U32)requiredValidationLayers.size();
-        deviceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
-#else
-        deviceCreateInfo.enabledLayerCount = 0;
-        deviceCreateInfo.ppEnabledLayerNames = nullptr;
-#endif
+        if( _validationEnabled ) {
+            deviceCreateInfo.enabledLayerCount = (U32)requiredValidationLayers.size();
+            deviceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
+        } else {
+            deviceCreateInfo.enabledLayerCount = 0;
+            deviceCreateInfo.ppEnabledLayerNames = nullptr;
+        }
 
         // Create the device
         VK_CHECK( vkCreateDevice( PhysicalDevice, &deviceCreateInfo, nullptr, &LogicalDevice ) );

@@ -10,13 +10,13 @@
 namespace Epoch {
 
     // Private event queue
-    std::queue<const Event*> _eventQueue;
+    std::queue<Event> _eventQueue;
 
     // Private, static map of events:handlers.
     std::map<const EventType, std::vector<IEventHandler*>*> _entries;
 
-    void EventManager::Post( const Event* event, const bool immediate ) {
-        auto entry = _entries.find( event->Type );
+    void EventManager::Post( const Event event, const bool immediate ) {
+        auto entry = _entries.find( event.Type );
         if( entry == _entries.end() ) {
             Logger::Trace( "EventManager::Post called for event type with no handlers listening." );
             return;
@@ -25,8 +25,6 @@ namespace Epoch {
 
                 // TODO: Should probably be using an object pool for this instead of new/delete.
                 processEvent( event );
-                delete event;
-                event = nullptr;
             } else {
                 _eventQueue.push( event );
             }
@@ -74,12 +72,9 @@ namespace Epoch {
 
         U32 processed = 0;
         while( !_eventQueue.empty() ) {
-            const Event* e = _eventQueue.front();
+            Event e = _eventQueue.front();
             _eventQueue.pop();
             processEvent( e );
-
-            delete e;
-            e = nullptr;
 
             processed++;
 
@@ -91,10 +86,10 @@ namespace Epoch {
         }
     }
 
-    void EventManager::processEvent( const Event* event ) {
-        auto entry = _entries.find( event->Type );
+    void EventManager::processEvent( const Event& event ) {
+        auto entry = _entries.find( event.Type );
         for( auto handler : *( ( *entry ).second ) ) {
-            handler->OnEvent( event );
+            handler->OnEvent( &event );
         }
     }
 }

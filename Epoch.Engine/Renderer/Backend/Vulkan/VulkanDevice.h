@@ -80,9 +80,10 @@ namespace Epoch {
          *
          * @param instance The Vulkan instance.
          * @param requiredValidationLayers The names of required validation layers. This should be empty on non-debug builds.
+         * @param validationEnabled Indicates if validation is enabled for this device. Carries a high performance cost.
          * @param surface The surface which this device will interact.
          */
-        VulkanDevice( VkInstance instance, const std::vector<const char*>& requiredValidationLayers, VkSurfaceKHR surface );
+        VulkanDevice( VkInstance instance, const bool validationEnabled, const std::vector<const char*>& requiredValidationLayers, VkSurfaceKHR surface );
 
         /**
          * Default destructor.
@@ -127,6 +128,7 @@ namespace Epoch {
         void createCommandPool();
         const bool detectDepthFormat();
     private:
+        bool _validationEnabled;
         VkInstance _instance;
         VkSurfaceKHR _surface;
     };

@@ -82,7 +82,7 @@ namespace Epoch {
          *
          * @return The calculated cross-product vector.
          */
-        Vector3 Cross( const Vector3& other );
+        Vector3& Cross( const Vector3& other );
 
         /**
          * Calculates the dot product of this and the vector passed in.
