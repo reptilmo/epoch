@@ -114,9 +114,9 @@ namespace Epoch {
                 }
 
                 // Memory info
-                for( U32 i = 0; i < memoryProperties.memoryHeapCount; ++i ) {
-                    F32 memorySizeMiB = ( ( (F32)memoryProperties.memoryHeaps[i].size ) / 1024.0f / 1024.0f );
-                    if( memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
+                for( U32 j = 0; j < memoryProperties.memoryHeapCount; ++j ) {
+                    F32 memorySizeMiB = ( ( (F32)memoryProperties.memoryHeaps[j].size ) / 1024.0f / 1024.0f );
+                    if( memoryProperties.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
                         Logger::Log( "Local GPU memory: %.2f MiB", memorySizeMiB );
                     } else {
                         Logger::Log( "Shared System memory: %.2f MiB", memorySizeMiB );
